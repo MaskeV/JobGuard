@@ -1,8 +1,137 @@
+/* ── App Container ──────────────────────────────────────── */
+.app {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Navigation Bar ─────────────────────────────────────── */
+.app-nav {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: rgba(6, 9, 16, 0.95);
+  border-bottom: 1px solid var(--border);
+  backdrop-filter: blur(12px);
+  padding: 0 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  height: 60px;
+}
+
+.app-nav__brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.app-nav__logo {
+  font-size: 24px;
+}
+
+.app-nav__title {
+  font-family: var(--head);
+  font-size: 20px;
+  font-weight: 900;
+  color: var(--accent);
+  letter-spacing: -0.5px;
+}
+
+.app-nav__tabs {
+  display: flex;
+  gap: 8px;
+}
+
+.app-nav__tab {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text2);
+  cursor: pointer;
+  transition: all 0.2s;
+  position: relative;
+}
+
+.app-nav__tab:hover {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.app-nav__tab--active {
+  color: var(--accent);
+  background: rgba(99, 179, 237, 0.08);
+  border-color: rgba(99, 179, 237, 0.2);
+}
+
+.app-nav__tab--active::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--accent);
+  border-radius: 2px 2px 0 0;
+}
+
+.app-nav__tab span:first-child {
+  font-size: 16px;
+}
+
+/* ── Content Area ───────────────────────────────────────── */
+.app-content {
+  flex: 1;
+  /* Remove default padding since pages handle their own */
+}
+
+/* ── Responsive ─────────────────────────────────────────── */
+@media (max-width: 640px) {
+  .app-nav {
+    padding: 0 16px;
+    height: 56px;
+  }
+
+  .app-nav__title {
+    font-size: 18px;
+  }
+
+  .app-nav__logo {
+    font-size: 20px;
+  }
+
+  .app-nav__tab {
+    padding: 8px 14px;
+    font-size: 12px;
+  }
+
+  .app-nav__tab span:first-child {
+    font-size: 14px;
+  }
+
+  /* Hide text on mobile, show only icons */
+  .app-nav__tab span:last-child {
+    display: none;
+  }
+
+  .app-nav__tabs {
+    gap: 6px;
+  }
+}
+
+/* ── Legacy Styles (for compatibility) ──────────────────── */
 #root {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
-  text-align: center;
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  text-align: left;
 }
 
 .logo {
@@ -11,9 +140,11 @@
   will-change: filter;
   transition: filter 300ms;
 }
+
 .logo:hover {
   filter: drop-shadow(0 0 2em #646cffaa);
 }
+
 .logo.react:hover {
   filter: drop-shadow(0 0 2em #61dafbaa);
 }

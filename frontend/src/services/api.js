@@ -1,4 +1,5 @@
-const BASE = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+// Fixed to use Vite's import.meta.env instead of process.env
+const BASE = import.meta.env.VITE_APP_API_URL || 'http://localhost:5000/api';
 
 async function request(method, path, body) {
   const res = await fetch(`${BASE}${path}`, {
@@ -21,3 +22,8 @@ export const getJobs     = (params)   => {
 export const updateJob   = (id, body) => request('PATCH', `/jobs/${id}`, body);
 export const deleteJob   = (id)       => request('DELETE', `/jobs/${id}`);
 export const getAnalytics = ()        => request('GET', '/analytics');
+
+export const scanEmails   = (body)    => request('POST', '/email/scan', body);
+
+export const searchJobs   = (body)    => request('POST', '/search/jobs', body);
+export const parseResume  = (text)    => request('POST', '/search/resume', { resumeText: text });

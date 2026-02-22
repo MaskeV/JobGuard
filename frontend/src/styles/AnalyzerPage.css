@@ -687,3 +687,45 @@
   .result-actions { grid-template-columns: 1fr; }
   .form-row-2 { grid-template-columns: 1fr; }
 }
+
+/* Add this to your AnalyzerPage.css file */
+
+/* ── Login Wall Notice ──────────────────────────────────── */
+.login-wall-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  background: rgba(99, 179, 237, 0.08);
+  border: 1px solid rgba(99, 179, 237, 0.2);
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin-bottom: 12px;
+}
+
+.login-wall-notice > span:first-child {
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.login-wall-notice strong {
+  font-size: 12px;
+  color: var(--accent);
+  display: block;
+  margin-bottom: 4px;
+}
+
+.login-wall-notice p {
+  font-size: 11px;
+  color: var(--text2);
+  line-height: 1.5;
+  margin: 0;
+}
+
+.login-wall-notice .tip {
+  margin-top: 6px;
+  color: var(--text);
+  background: rgba(52, 211, 153, 0.08);
+  border: 1px solid rgba(52, 211, 153, 0.15);
+  padding: 6px 10px;
+  border-radius: 6px;
+}
