@@ -100,7 +100,7 @@ function detectStatusFromEmail(subject, body) {
   return 'Applied'; // Default
 }
 
-// ── Extract job details from email ────────────────────────────────────────────
+// ── IMPROVED: Extract job details from email ─────────────────────────────────
 function extractJobDetails(subject, body, html) {
   const details = {
     title: null,
@@ -152,35 +152,143 @@ function extractJobDetails(subject, body, html) {
     }
   });
 
-  // Extract job title (common patterns)
+  // ── IMPROVED: Extract job title ──────────────────────────────────────────
   const titlePatterns = [
-    /position:?\s*(.+?)(?:\n|<br|$)/i,
-    /role:?\s*(.+?)(?:\n|<br|$)/i,
-    /job title:?\s*(.+?)(?:\n|<br|$)/i,
-    /application.*?for\s+(.+?)\s+(?:at|with|position)/i,
-    /applied.*?for\s+(.+?)\s+(?:at|with|position)/i,
+    // LinkedIn specific
+    /You applied to\s+(.+?)\s+at\s+/i,
+    /application for\s+(.+?)\s+at\s+/i,
+    /You're a top applicant for\s+(.+?)\s+at\s+/i,
+    /(?:applied|application).*?:\s*(.+?)\s+at\s+/i,
+    
+    // Naukri specific  
+    /applied for\s+(.+?)\s+(?:job\s+)?(?:at|with|in)\s+/i,
+    /application.*?(?:job|position|role):\s*(.+?)(?:\n|at|with)/i,
+    /Job:\s*(.+?)(?:\n|<br|at|Company)/i,
+    
+    // Indeed specific
+    /(?:applied|application) (?:to|for)\s+(.+?)\s+(?:at|with)/i,
+    
+    // Generic patterns
+    /(?:position|role|job title|opening):\s*(.+?)(?:\n|<br|at|with|$)/i,
+    /for (?:the )?(position of|role of)\s+(.+?)(?:\n|<br|at|$)/i,
+    
+    // Subject line patterns (very common in LinkedIn/Naukri)
+    /^(?:Application|Applied|You applied).*?(?:for|to)[\s:]+(.+?)\s+(?:at|with|[-–—])/i,
+    /Application for\s+(.+?)(?:\s+at\s+|\s+-\s+|\s+with\s+)/i,
   ];
   
   for (const pattern of titlePatterns) {
-    const match = (subject + ' ' + body).match(pattern);
-    if (match && match[1]) {
-      details.title = match[1].trim().replace(/<[^>]*>/g, '').substring(0, 100);
-      break;
+    const match = (subject + '\n' + body).match(pattern);
+    if (match) {
+      let title = match[1] || match[2];
+      if (title) {
+        title = title
+          .trim()
+          .replace(/<[^>]*>/g, '')  // Remove HTML tags
+          .replace(/\s+/g, ' ')      // Normalize spaces
+          .replace(/^[-–—:]\s*/, '') // Remove leading dashes/colons
+          .replace(/\s*[-–—:]$/, '') // Remove trailing dashes/colons
+          .replace(/\s*\(.*?\)\s*/g, '') // Remove parenthetical
+          .substring(0, 100);
+        
+        // Skip if it looks like a company name or is too short
+        const looksLikeCompany = title.match(/^[A-Z][a-z]+\s+(?:Inc|Ltd|LLC|Corp|Pvt|Limited|Technologies|Solutions)/);
+        const isTooShort = title.length < 4;
+        const isAllCaps = title === title.toUpperCase() && title.length < 20; // Skip short ALL CAPS (might be codes)
+        
+        if (!looksLikeCompany && !isTooShort && !isAllCaps) {
+          details.title = title;
+          break;
+        }
+      }
     }
   }
 
-  // Extract company name
+  // ── IMPROVED: Extract company name ───────────────────────────────────────
   const companyPatterns = [
-    /company:?\s*(.+?)(?:\n|<br|$)/i,
-    /at\s+([A-Z][a-zA-Z\s&.]+?)(?:\s+for|,|\.|$)/,
-    /with\s+([A-Z][a-zA-Z\s&.]+?)(?:\s+for|,|\.|$)/,
+    // LinkedIn specific patterns
+    /You applied to .+ at\s+(.+?)(?:\n|<br|$|via|on|through|\s+\||\.)/i,
+    /application for .+ at\s+(.+?)(?:\n|<br|$|via|on|through|\s+\||\.)/i,
+    /top applicant for .+ at\s+(.+?)(?:\n|<br|$|via|on|through|\s+\||\.)/i,
+    
+    // Naukri specific patterns
+    /applied for .+ (?:job\s+)?(?:at|with|in)\s+(.+?)(?:\n|<br|$|for|on|\s+\||\.)/i,
+    /Job at\s+(.+?)(?:\n|<br|$|-|\s+\||\.)/i,
+    /Company:\s*(.+?)(?:\n|<br|Location|$|\s+\||\.)/i,
+    /Employer:\s*(.+?)(?:\n|<br|$|\s+\||\.)/i,
+    
+    // Indeed specific patterns
+    /applied (?:to|at)\s+(.+?)\s+(?:for|on|as|\n)/i,
+    
+    // Generic patterns - match company names (typically capitalized words)
+    /(?:at|with|@)\s+([A-Z][a-zA-Z0-9\s&.,'-]+(?:Inc|Ltd|LLC|Corp|Co|Pvt|Limited|Group|Technologies|Solutions|Software|Systems|Services)?)\s+(?:for|on|via|as|\n|<br|$|\s+\||\.)/i,
+    /(?:at|with|@)\s+([A-Z][a-zA-Z][a-zA-Z\s&.,'-]{2,50}?)(?:\s+(?:for|on|via|in|as|\n|<br|$|\s+\||-))/,
+    
+    // Additional structured formats
+    /Company Name:\s*(.+?)(?:\n|<br|$|\s+\||\.)/i,
+    /Organization:\s*(.+?)(?:\n|<br|$|\s+\||\.)/i,
+    
+    // From HTML structure (look for company in mailto or specific tags)
+    /<td[^>]*>Company:<\/td>\s*<td[^>]*>(.+?)<\/td>/i,
   ];
   
   for (const pattern of companyPatterns) {
-    const match = (subject + ' ' + body).match(pattern);
+    const match = (subject + '\n' + body + '\n' + html).match(pattern);
     if (match && match[1]) {
-      details.company = match[1].trim().replace(/<[^>]*>/g, '').substring(0, 100);
-      break;
+      let company = match[1]
+        .trim()
+        .replace(/<[^>]*>/g, '')   // Remove HTML tags
+        .replace(/\s+/g, ' ')       // Normalize spaces
+        .replace(/^[-–—:*•]\s*/, '')  // Remove leading punctuation/bullets
+        .replace(/\s*[-–—:*•]$/, '')  // Remove trailing punctuation
+        .replace(/\s*\(.*?\)\s*/g, '') // Remove parenthetical notes
+        .replace(/\s+(?:via|on|at)\s+.+$/i, '') // Remove trailing "via LinkedIn" etc
+        .substring(0, 100);
+      
+      // Skip common false positives
+      const skipWords = [
+        'LinkedIn', 'Indeed', 'Naukri', 'Internshala', 'Monster', 'Shine', 'TimesJobs',
+        'the job', 'this position', 'our team', 'email', 'job board', 'portal',
+        'click here', 'view', 'apply', 'application', 'unsubscribe'
+      ];
+      const shouldSkip = skipWords.some(word => company.toLowerCase() === word.toLowerCase() || 
+                                                 company.toLowerCase().includes(word.toLowerCase() + ' ') ||
+                                                 company.toLowerCase().includes(' ' + word.toLowerCase()));
+      
+      // Additional validation
+      const isTooShort = company.length < 2;
+      const isAllNumbers = /^\d+$/.test(company);
+      const isEmailAddress = /@/.test(company);
+      const isUrl = /https?:\/\//.test(company);
+      const hasOnlySpecialChars = /^[^a-zA-Z0-9]+$/.test(company);
+      
+      if (!isTooShort && !isAllNumbers && !shouldSkip && !isEmailAddress && !isUrl && !hasOnlySpecialChars) {
+        details.company = company;
+        break;
+      }
+    }
+  }
+  
+  // ── Fallback: Try to extract from email HTML structure ───────────────────
+  if (!details.company && html) {
+    // Look for company in common HTML table structures
+    const htmlCompanyMatch = html.match(/<td[^>]*>\s*(?:Company|Employer|Organization)[:\s]*<\/td>\s*<td[^>]*>([^<]+)<\/td>/i);
+    if (htmlCompanyMatch && htmlCompanyMatch[1]) {
+      let company = htmlCompanyMatch[1].trim();
+      if (company.length >= 2) {
+        details.company = company.substring(0, 100);
+      }
+    }
+  }
+  
+  if (!details.title && html) {
+    // Look for title in common HTML table structures
+    const htmlTitleMatch = html.match(/<td[^>]*>\s*(?:Job Title|Position|Role)[:\s]*<\/td>\s*<td[^>]*>([^<]+)<\/td>/i);
+    if (htmlTitleMatch && htmlTitleMatch[1]) {
+      let title = htmlTitleMatch[1].trim();
+      if (title.length >= 4) {
+        details.title = title.substring(0, 100);
+      }
     }
   }
 
@@ -227,7 +335,7 @@ async function scanEmails({ email, password, daysBack = 30, limit = 50 }) {
         const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
         const dateStr = `${months[searchDate.getMonth()]} ${String(searchDate.getDate()).padStart(2, '0')}, ${searchDate.getFullYear()}`;
 
-        console.log(`🔍 Searching emls since: ${dateStr}`);
+        console.log(`🔍 Searching emails since: ${dateStr}`);
 
         // IMAP search syntax: SINCE must be in array format [criteria, value]
         const searchCriteria = [['SINCE', dateStr]];
@@ -295,7 +403,7 @@ async function scanEmails({ email, password, daysBack = 30, limit = 50 }) {
                       ...details,
                     });
                     
-                    console.log(`✓ Found job email: ${subject.substring(0, 50)}...`);
+                    console.log(`✓ Found: "${details.title || 'Unknown Title'}" at "${details.company || 'Unknown Company'}"`);
                   } else {
                     // Log emails from job platforms that don't have URLs (for debugging)
                     if (isFromJobPlatform) {
@@ -420,7 +528,7 @@ async function importApplicationsFromEmail(Job, { email, password, daysBack = 30
             if (analysis.extractedTitle) jobData.title = analysis.extractedTitle;
             if (analysis.extractedCompany) jobData.company = analysis.extractedCompany;
           } catch (analyzeErr) {
-            console.warn('⚠️  Model analysis failed:', analyzeErr.message);
+            console.warn('⚠️  AI analysis failed:', analyzeErr.message);
           }
         }
 

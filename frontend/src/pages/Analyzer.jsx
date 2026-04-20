@@ -416,7 +416,7 @@ export default function AnalyzerPage() {
 
               {/* ── Summary ── */}
               <div className="result-section">
-                <div className="result-section__title">AI Summary</div>
+                <div className="result-section__title">Summary</div>
                 <p className="result-summary">{result.summary}</p>
               </div>
 
