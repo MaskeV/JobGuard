@@ -48,6 +48,7 @@ const JOB_PATTERNS = {
   urlPatterns: [
     // International platforms
     /linkedin\.com\/jobs\/view\/\d+/gi,
+    /linkedin\.com\/comm\/jobs\/view\/\d+/gi,  // Email links
     /indeed\.com\/viewjob\?jk=[a-f0-9]+/gi,
     /indeed\.com\/job\//gi,
     /glassdoor\.com\/job-listing\//gi,
@@ -80,6 +81,37 @@ const JOB_PATTERNS = {
   ],
 };
 
+// ── Filter out bulk/aggregate notification emails ────────────────────────────
+function isBulkNotificationEmail(subject, body) {
+  const bulkPatterns = [
+    // LinkedIn bulk notifications
+    /\d+\s+(?:more\s+)?jobs?\s+(?:in|for|at)/i,  // "12 more jobs in Pune"
+    /\d+\s+jobs?\s+(?:that\s+)?you\s+haven't\s+applied/i,  // "7 jobs you haven't applied"
+    /and\s+\d+\s+more\s+jobs/i,  // "Enzigma and 12 more jobs"
+    /jobs?\s+you\s+may\s+be\s+interested/i,  // "Jobs you may be interested in"
+    /recommended\s+(?:for\s+)?you/i,  // "Recommended for you"
+    /suggested\s+jobs?/i,  // "Suggested jobs"
+    /(?:daily|weekly)\s+job\s+alert/i,  // "Daily job alert"
+    /new\s+jobs?\s+for\s+you/i,  // "New jobs for you"
+    /jobs?\s+matching\s+your/i,  // "Jobs matching your..."
+    
+    // Naukri bulk notifications
+    /best\s+matching\s+jobs?/i,
+    /jobs?\s+as\s+per\s+your\s+profile/i,
+    /recommended\s+jobs?\s+based\s+on/i,
+    
+    // Indeed bulk notifications
+    /jobs?\s+matching\s+your\s+(?:search|preferences)/i,
+    
+    // Generic patterns
+    /\d+\s+new\s+jobs?/i,  // "5 new jobs"
+    /top\s+\d+\s+jobs?/i,  // "Top 10 jobs"
+  ];
+  
+  const text = (subject + ' ' + body).toLowerCase();
+  return bulkPatterns.some(pattern => pattern.test(text));
+}
+
 // ── Status detection from email content ──────────────────────────────────────
 function detectStatusFromEmail(subject, body) {
   const text = (subject + ' ' + body).toLowerCase();
@@ -108,18 +140,45 @@ function extractJobDetails(subject, body, html) {
     urls: [],
   };
 
-  // Extract URLs - try both text and HTML
+  // Combine all text sources
   const allText = (html || body || '') + ' ' + subject;
   
-  // First try platform-specific patterns
+  // CRITICAL: Clean HTML entities FIRST before any pattern matching
+  const cleanText = allText
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&#x27;/g, "'")
+    .replace(/&nbsp;/g, ' ');
+  
+  // ── ENHANCED: LinkedIn tracking URL extraction ──────────────────────────────
+  // LinkedIn URLs have this pattern: /jobs/view/JOBID/?trackingId=HASH&refId=HASH
+  const linkedInPattern = /https?:\/\/(?:www\.)?linkedin\.com\/(?:comm\/)?jobs\/view\/\d+\/?\?[^\s<>"]+/gi;
+  const linkedInMatches = cleanText.match(linkedInPattern) || [];
+  
+  linkedInMatches.forEach(rawUrl => {
+    // Clean up: remove HTML artifacts and normalize
+    let url = rawUrl
+      .replace(/[.,;!?\)\]}>'"]+$/, '')       // Remove trailing punctuation
+      .replace(/%3D%3D&.*$/, '%3D%3D')        // Keep only trackingId, remove refId
+      .replace(/&refId=[^&\s]+/g, '')         // Remove refId parameter
+      .replace(/\\/g, '')                     // Remove escape chars
+      .replace(/&trackingId=.*?(?=&|$)/, (match) => match.split('&')[0]); // Clean trackingId
+    
+    if (!details.urls.includes(url)) {
+      details.urls.push(url);
+    }
+  });
+  
+  // ── Platform-specific URL patterns ──────────────────────────────────────────
   JOB_PATTERNS.urlPatterns.forEach(pattern => {
-    const matches = allText.matchAll(pattern);
+    const matches = cleanText.matchAll(pattern);
     for (const match of matches) {
-      let url = match[0];
-      
-      // Clean up URL (remove trailing punctuation, HTML entities, etc.)
-      url = url.replace(/[.,;!?\)\]}>]+$/, ''); // Remove trailing punctuation
-      url = url.replace(/&amp;/g, '&'); // Fix HTML entities
+      let url = match[0]
+        .replace(/[.,;!?\)\]}>'"]+$/, '')
+        .replace(/\\/g, '');
       
       // Make sure it starts with http
       if (!url.startsWith('http')) {
@@ -132,12 +191,12 @@ function extractJobDetails(subject, body, html) {
     }
   });
   
-  // Fallback: Look for any URLs from known job domains
+  // ── Fallback: Generic job URLs ──────────────────────────────────────────────
   const urlRegex = /https?:\/\/[^\s<>"]+/gi;
-  const allUrls = allText.match(urlRegex) || [];
+  const allUrls = cleanText.match(urlRegex) || [];
   
-  allUrls.forEach(url => {
-    const cleanUrl = url.replace(/[.,;!?\)\]}>]+$/, '');
+  allUrls.forEach(rawUrl => {
+    const cleanUrl = rawUrl.replace(/[.,;!?\)\]}>'"]+$/, '');
     const isJobUrl = JOB_PATTERNS.senderDomains.some(domain => 
       cleanUrl.includes(domain) && (
         cleanUrl.includes('/job') || 
@@ -152,27 +211,28 @@ function extractJobDetails(subject, body, html) {
     }
   });
 
-  // ── IMPROVED: Extract job title ──────────────────────────────────────────
+  // ── IMPROVED: Title extraction (avoid notification text) ────────────────────
   const titlePatterns = [
-    // LinkedIn specific
-    /You applied to\s+(.+?)\s+at\s+/i,
-    /application for\s+(.+?)\s+at\s+/i,
-    /You're a top applicant for\s+(.+?)\s+at\s+/i,
+    // LinkedIn specific - AVOID bulk notification patterns
+    /(?:^|: )([A-Z][^:\n]{10,80}?)\s+at\s+[A-Z]/m,  // "Title at Company"
+    /You applied (?:to|for)\s+([^:\n]{8,80}?)\s+at\s+/i,
+    /application for\s+([^:\n]{8,80}?)\s+at\s+/i,
+    /You're a top applicant for\s+([^:\n]{8,80}?)\s+at\s+/i,
     /(?:applied|application).*?:\s*(.+?)\s+at\s+/i,
     
     // Naukri specific  
-    /applied for\s+(.+?)\s+(?:job\s+)?(?:at|with|in)\s+/i,
+    /applied for\s+([^:\n]{8,80}?)\s+(?:job\s+)?(?:at|with|in)\s+/i,
     /application.*?(?:job|position|role):\s*(.+?)(?:\n|at|with)/i,
     /Job:\s*(.+?)(?:\n|<br|at|Company)/i,
     
     // Indeed specific
-    /(?:applied|application) (?:to|for)\s+(.+?)\s+(?:at|with)/i,
+    /(?:applied|application) (?:to|for)\s+([^:\n]{8,80}?)\s+(?:at|with)/i,
     
     // Generic patterns
     /(?:position|role|job title|opening):\s*(.+?)(?:\n|<br|at|with|$)/i,
     /for (?:the )?(position of|role of)\s+(.+?)(?:\n|<br|at|$)/i,
     
-    // Subject line patterns (very common in LinkedIn/Naukri)
+    // Subject line patterns
     /^(?:Application|Applied|You applied).*?(?:for|to)[\s:]+(.+?)\s+(?:at|with|[-–—])/i,
     /Application for\s+(.+?)(?:\s+at\s+|\s+-\s+|\s+with\s+)/i,
   ];
@@ -184,19 +244,20 @@ function extractJobDetails(subject, body, html) {
       if (title) {
         title = title
           .trim()
-          .replace(/<[^>]*>/g, '')  // Remove HTML tags
-          .replace(/\s+/g, ' ')      // Normalize spaces
-          .replace(/^[-–—:]\s*/, '') // Remove leading dashes/colons
-          .replace(/\s*[-–—:]$/, '') // Remove trailing dashes/colons
-          .replace(/\s*\(.*?\)\s*/g, '') // Remove parenthetical
+          .replace(/<[^>]*>/g, '')          // Remove HTML tags
+          .replace(/\s+/g, ' ')              // Normalize spaces
+          .replace(/^[-–—:]\s*/, '')         // Remove leading dashes/colons
+          .replace(/\s*[-–—:]$/, '')         // Remove trailing dashes/colons
+          .replace(/\s*\(.*?\)\s*/g, '')     // Remove parenthetical
           .substring(0, 100);
         
-        // Skip if it looks like a company name or is too short
+        // ⚠️ CRITICAL: Skip if it's a bulk notification phrase
+        const isBulkPhrase = /\d+\s+(?:more\s+)?jobs?|and\s+\d+\s+more|you\s+haven't\s+applied|may\s+be\s+interested/i.test(title);
         const looksLikeCompany = title.match(/^[A-Z][a-z]+\s+(?:Inc|Ltd|LLC|Corp|Pvt|Limited|Technologies|Solutions)/);
-        const isTooShort = title.length < 4;
-        const isAllCaps = title === title.toUpperCase() && title.length < 20; // Skip short ALL CAPS (might be codes)
+        const isTooShort = title.length < 8;
+        const isAllCaps = title === title.toUpperCase() && title.length < 20;
         
-        if (!looksLikeCompany && !isTooShort && !isAllCaps) {
+        if (!isBulkPhrase && !looksLikeCompany && !isTooShort && !isAllCaps) {
           details.title = title;
           break;
         }
@@ -204,32 +265,29 @@ function extractJobDetails(subject, body, html) {
     }
   }
 
-  // ── IMPROVED: Extract company name ───────────────────────────────────────
+  // ── IMPROVED: Company extraction (avoid bulk text) ──────────────────────────
   const companyPatterns = [
     // LinkedIn specific patterns
-    /You applied to .+ at\s+(.+?)(?:\n|<br|$|via|on|through|\s+\||\.)/i,
-    /application for .+ at\s+(.+?)(?:\n|<br|$|via|on|through|\s+\||\.)/i,
-    /top applicant for .+ at\s+(.+?)(?:\n|<br|$|via|on|through|\s+\||\.)/i,
+    /You applied to .+ at\s+([A-Z][^:\n]{2,60}?)(?:\s+(?:for|on|via|as|\n|<br|$|\s+\||\.|-|–))/i,
+    /application for .+ at\s+([A-Z][^:\n]{2,60}?)(?:\s+(?:for|on|via|as|\n|<br|$|\s+\||\.|-|–))/i,
+    /top applicant for .+ at\s+([A-Z][^:\n]{2,60}?)(?:\s+(?:for|on|via|as|\n|<br|$|\s+\||\.|-|–))/i,
     
     // Naukri specific patterns
-    /applied for .+ (?:job\s+)?(?:at|with|in)\s+(.+?)(?:\n|<br|$|for|on|\s+\||\.)/i,
-    /Job at\s+(.+?)(?:\n|<br|$|-|\s+\||\.)/i,
-    /Company:\s*(.+?)(?:\n|<br|Location|$|\s+\||\.)/i,
-    /Employer:\s*(.+?)(?:\n|<br|$|\s+\||\.)/i,
+    /applied for .+ (?:job\s+)?(?:at|with|in)\s+([A-Z][^:\n]{2,60}?)(?:\n|<br|$|for|on|\s+\||\.|-|–)/i,
+    /Job at\s+([A-Z][^:\n]{2,60}?)(?:\n|<br|$|-|\s+\||\.)/i,
+    /Company:\s*([A-Z][^:\n<]{2,60}?)(?:\n|<br|Location|$|\s+\||\.)/i,
+    /Employer:\s*([A-Z][^:\n<]{2,60}?)(?:\n|<br|$|\s+\||\.)/i,
     
     // Indeed specific patterns
-    /applied (?:to|at)\s+(.+?)\s+(?:for|on|as|\n)/i,
+    /applied (?:to|at)\s+([A-Z][^:\n]{2,60}?)\s+(?:for|on|as|\n)/i,
     
     // Generic patterns - match company names (typically capitalized words)
-    /(?:at|with|@)\s+([A-Z][a-zA-Z0-9\s&.,'-]+(?:Inc|Ltd|LLC|Corp|Co|Pvt|Limited|Group|Technologies|Solutions|Software|Systems|Services)?)\s+(?:for|on|via|as|\n|<br|$|\s+\||\.)/i,
-    /(?:at|with|@)\s+([A-Z][a-zA-Z][a-zA-Z\s&.,'-]{2,50}?)(?:\s+(?:for|on|via|in|as|\n|<br|$|\s+\||-))/,
+    /(?:at|with|@)\s+([A-Z][a-zA-Z0-9\s&.,'-]+(?:Inc|Ltd|LLC|Corp|Co|Pvt|Limited|Group|Technologies|Solutions|Software|Systems|Services)?)\s+(?:for|on|via|as|\n|<br|$|\s+\||\.|-|–)/i,
+    /(?:at|with|@)\s+([A-Z][a-zA-Z][a-zA-Z\s&.,'-]{2,50}?)(?:\s+(?:for|on|via|in|as|\n|<br|$|\s+\||-|–))/,
     
     // Additional structured formats
-    /Company Name:\s*(.+?)(?:\n|<br|$|\s+\||\.)/i,
-    /Organization:\s*(.+?)(?:\n|<br|$|\s+\||\.)/i,
-    
-    // From HTML structure (look for company in mailto or specific tags)
-    /<td[^>]*>Company:<\/td>\s*<td[^>]*>(.+?)<\/td>/i,
+    /Company Name:\s*([A-Z][^:\n<]{2,60}?)(?:\n|<br|$|\s+\||\.)/i,
+    /Organization:\s*([A-Z][^:\n<]{2,60}?)(?:\n|<br|$|\s+\||\.)/i,
   ];
   
   for (const pattern of companyPatterns) {
@@ -237,19 +295,20 @@ function extractJobDetails(subject, body, html) {
     if (match && match[1]) {
       let company = match[1]
         .trim()
-        .replace(/<[^>]*>/g, '')   // Remove HTML tags
-        .replace(/\s+/g, ' ')       // Normalize spaces
-        .replace(/^[-–—:*•]\s*/, '')  // Remove leading punctuation/bullets
-        .replace(/\s*[-–—:*•]$/, '')  // Remove trailing punctuation
-        .replace(/\s*\(.*?\)\s*/g, '') // Remove parenthetical notes
+        .replace(/<[^>]*>/g, '')              // Remove HTML tags
+        .replace(/\s+/g, ' ')                 // Normalize spaces
+        .replace(/^[-–—:*•]\s*/, '')          // Remove leading punctuation/bullets
+        .replace(/\s*[-–—:*•]$/, '')          // Remove trailing punctuation
+        .replace(/\s*\(.*?\)\s*/g, '')        // Remove parenthetical notes
         .replace(/\s+(?:via|on|at)\s+.+$/i, '') // Remove trailing "via LinkedIn" etc
         .substring(0, 100);
       
-      // Skip common false positives
+      // ⚠️ CRITICAL: Skip bulk notification phrases
+      const isBulkPhrase = /\d+\s+(?:more\s+)?jobs?|and\s+\d+\s+more|you\s+haven't\s+applied|may\s+be\s+interested/i.test(company);
       const skipWords = [
         'LinkedIn', 'Indeed', 'Naukri', 'Internshala', 'Monster', 'Shine', 'TimesJobs',
         'the job', 'this position', 'our team', 'email', 'job board', 'portal',
-        'click here', 'view', 'apply', 'application', 'unsubscribe'
+        'click here', 'view', 'apply', 'application', 'unsubscribe', 'Apply Now'
       ];
       const shouldSkip = skipWords.some(word => company.toLowerCase() === word.toLowerCase() || 
                                                  company.toLowerCase().includes(word.toLowerCase() + ' ') ||
@@ -262,20 +321,20 @@ function extractJobDetails(subject, body, html) {
       const isUrl = /https?:\/\//.test(company);
       const hasOnlySpecialChars = /^[^a-zA-Z0-9]+$/.test(company);
       
-      if (!isTooShort && !isAllNumbers && !shouldSkip && !isEmailAddress && !isUrl && !hasOnlySpecialChars) {
+      if (!isBulkPhrase && !shouldSkip && !isTooShort && !isAllNumbers && !isEmailAddress && !isUrl && !hasOnlySpecialChars) {
         details.company = company;
         break;
       }
     }
   }
   
-  // ── Fallback: Try to extract from email HTML structure ───────────────────
+  // ── Fallback: Try to extract from email HTML structure ──────────────────────
   if (!details.company && html) {
     // Look for company in common HTML table structures
     const htmlCompanyMatch = html.match(/<td[^>]*>\s*(?:Company|Employer|Organization)[:\s]*<\/td>\s*<td[^>]*>([^<]+)<\/td>/i);
     if (htmlCompanyMatch && htmlCompanyMatch[1]) {
       let company = htmlCompanyMatch[1].trim();
-      if (company.length >= 2) {
+      if (company.length >= 2 && !/\d+\s+more\s+jobs/i.test(company)) {
         details.company = company.substring(0, 100);
       }
     }
@@ -286,7 +345,7 @@ function extractJobDetails(subject, body, html) {
     const htmlTitleMatch = html.match(/<td[^>]*>\s*(?:Job Title|Position|Role)[:\s]*<\/td>\s*<td[^>]*>([^<]+)<\/td>/i);
     if (htmlTitleMatch && htmlTitleMatch[1]) {
       let title = htmlTitleMatch[1].trim();
-      if (title.length >= 4) {
+      if (title.length >= 8 && !/\d+\s+more\s+jobs/i.test(title)) {
         details.title = title.substring(0, 100);
       }
     }
@@ -295,7 +354,7 @@ function extractJobDetails(subject, body, html) {
   return details;
 }
 
-// ── Scan emails ───────────────────────────────────────────────────────────────
+// ── Scan emails ──────────────────────────────────────────────────────────────
 async function scanEmails({ email, password, daysBack = 30, limit = 50 }) {
   return new Promise((resolve, reject) => {
     // Validate and clean password (remove spaces if any)
@@ -368,6 +427,10 @@ async function scanEmails({ email, password, daysBack = 30, limit = 50 }) {
               simpleParser(stream, async (err, parsed) => {
                 if (err) {
                   console.error('Parse error:', err);
+                  processed++;
+                  if (processed === limitedResults.length) {
+                    imap.end();
+                  }
                   return;
                 }
 
@@ -375,6 +438,16 @@ async function scanEmails({ email, password, daysBack = 30, limit = 50 }) {
                 const body = parsed.text || '';
                 const html = parsed.html || '';
                 const from = parsed.from?.text || '';
+
+                // ⚠️ CRITICAL: Skip bulk notification emails FIRST
+                if (isBulkNotificationEmail(subject, body)) {
+                  console.log(`⏭️  Skipped bulk notification: ${subject.substring(0, 60)}...`);
+                  processed++;
+                  if (processed === limitedResults.length) {
+                    imap.end();
+                  }
+                  return;  // Skip this email entirely
+                }
 
                 // Check if email is from a job platform OR has job-related content
                 const isFromJobPlatform = JOB_PATTERNS.senderDomains.some(domain => 
@@ -456,7 +529,7 @@ async function scanEmails({ email, password, daysBack = 30, limit = 50 }) {
   });
 }
 
-// ── Auto-import with AI analysis ──────────────────────────────────────────────
+// ── Auto-import with AI analysis ─────────────────────────────────────────────
 async function importApplicationsFromEmail(Job, { email, password, daysBack = 30, analyzeWithAI = true }) {
   try {
     // Step 1: Scan emails
