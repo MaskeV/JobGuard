@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
-import AnalyzerPage from './pages/Analyzer.jsx'; // Note: filename has space
+import AnalyzerPage from './pages/Analyzer.jsx';
 import Dashboard from './pages/Dashboard.jsx';
 import JobSearch from './pages/JobSearch.jsx';
+import AIInsights from './pages/AiInsights.jsx';
+import ResumeMatcher from './pages/ResumematchMaker.jsx';
 import './App.css';
 
 export default function App() {
-  const [page, setPage] = useState('analyzer'); // 'analyzer' | 'dashboard' | 'search'
+  const [page, setPage] = useState('analyzer');
   const [error, setError] = useState(null);
 
   useEffect(() => {
@@ -74,6 +76,22 @@ export default function App() {
               <span>🔎</span>
               <span>Job Search</span>
             </button>
+
+            <button 
+              className={`app-nav__tab ${page === 'insights' ? 'app-nav__tab--active' : ''}`}
+              onClick={() => setPage('insights')}
+            >
+              <span>✦</span>
+              <span>AI Insights</span>
+            </button>
+
+            <button 
+              className={`app-nav__tab ${page === 'matcher' ? 'app-nav__tab--active' : ''}`}
+              onClick={() => setPage('matcher')}
+            >
+              <span>🎯</span>
+              <span>Resume Match</span>
+            </button>
           </div>
         </nav>
 
@@ -82,6 +100,8 @@ export default function App() {
           {page === 'analyzer' && <AnalyzerPage />}
           {page === 'dashboard' && <Dashboard />}
           {page === 'search' && <JobSearch />}
+          {page === 'insights' && <AIInsights />}
+          {page === 'matcher' && <ResumeMatcher />}
         </div>
       </div>
     );

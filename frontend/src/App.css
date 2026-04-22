@@ -171,3 +171,29 @@
 .read-the-docs {
   color: #888;
 }
+
+@media (max-width: 900px) {
+  .app-nav__tabs {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  .app-nav__tab {
+    white-space: nowrap;
+  }
+}
+
+@media (max-width: 640px) {
+  .app-nav__tabs {
+    gap: 4px;
+  }
+  
+  /* Show only icons on very small screens */
+  .app-nav__tab span:last-child {
+    display: none;
+  }
+  
+  .app-nav__tab {
+    padding: 8px 12px;
+  }
+}

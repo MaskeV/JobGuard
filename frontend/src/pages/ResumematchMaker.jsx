@@ -4,30 +4,16 @@ import '../styles/ResumematchMaker.css';
 const API_BASE = import.meta.env.VITE_APP_API_URL || 'http://localhost:5000/api';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-async function callGeminiViaBackend(prompt) {
-  // We route through the backend's /api/analyze proxy to keep the API key safe
-  // The backend has Gemini configured, so we'll use a dedicated endpoint
-  const res = await fetch(`${API_BASE}/match`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ prompt }),
-  });
-  if (!res.ok) throw new Error('Backend match endpoint not available');
-  return res.json();
-}
+// Replace these two functions in ResumematchMaker.jsx
 
-// Fallback: use Anthropic API via the artifact system (client-side)
 async function analyzeMatch({ resume, jobDescription, jobTitle, company }) {
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 1500,
-      system: `You are an expert career coach and ATS specialist. Analyze resume-job fit and respond ONLY with a valid JSON object, no markdown.`,
-      messages: [{
-        role: 'user',
-        content: `Analyze this resume vs job description match.
+  const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
+  
+  if (!GEMINI_API_KEY) {
+    throw new Error('GEMINI_API_KEY not configured in .env file');
+  }
+
+  const prompt = `You are an expert career coach and ATS specialist. Analyze resume-job fit and respond ONLY with a valid JSON object, no markdown.
 
 JOB TITLE: ${jobTitle || 'Not specified'}
 COMPANY: ${company || 'Not specified'}
@@ -51,27 +37,87 @@ Respond with ONLY this JSON (no markdown, no backticks):
   },
   "atsScore": <integer 0-100>,
   "suggestions": ["<specific improvement 1>", "<improvement 2>", "<improvement 3>"]
-}`
-      }]
-    })
-  });
-  if (!res.ok) throw new Error('Analysis failed');
-  const data = await res.json();
-  const text = data.content?.[0]?.text || '';
-  return JSON.parse(text.replace(/```json|```/g, '').trim());
+}`;
+
+  try {
+    const { GoogleGenerativeAI } = await import('@google/generative-ai');
+    const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    
+    const result = await model.generateContent(prompt);
+    const raw = result.response.text().trim();
+    
+    // Parse JSON (strip accidental markdown)
+    const cleaned = raw.replace(/^```(?:json)?/m, '').replace(/```$/m, '').trim();
+    return JSON.parse(cleaned);
+  } catch (err) {
+    console.error('Gemini API error:', err);
+    throw new Error(`Analysis failed: ${err.message}`);
+  }
+}
+
+// Replace these two functions in ResumematchMaker.jsx
+
+async function analyzeMatch({ resume, jobDescription, jobTitle, company }) {
+  const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
+  
+  if (!GEMINI_API_KEY) {
+    throw new Error('GEMINI_API_KEY not configured in .env file');
+  }
+
+  const prompt = `You are an expert career coach and ATS specialist. Analyze resume-job fit and respond ONLY with a valid JSON object, no markdown.
+
+JOB TITLE: ${jobTitle || 'Not specified'}
+COMPANY: ${company || 'Not specified'}
+
+JOB DESCRIPTION:
+${jobDescription.slice(0, 2000)}
+
+RESUME:
+${resume.slice(0, 2000)}
+
+Respond with ONLY this JSON (no markdown, no backticks):
+{
+  "matchScore": <integer 0-100>,
+  "matchLevel": "Excellent" | "Good" | "Fair" | "Poor",
+  "summary": "<2-3 sentence overall assessment>",
+  "strengths": ["<strength 1>", "<strength 2>", "<strength 3>"],
+  "gaps": ["<missing skill/exp 1>", "<gap 2>"],
+  "keywords": {
+    "matched": ["<keyword found in both>"],
+    "missing": ["<keyword in JD not in resume>"]
+  },
+  "atsScore": <integer 0-100>,
+  "suggestions": ["<specific improvement 1>", "<improvement 2>", "<improvement 3>"]
+}`;
+
+  try {
+    const { GoogleGenerativeAI } = await import('@google/generative-ai');
+    const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    
+    const result = await model.generateContent(prompt);
+    const raw = result.response.text().trim();
+    
+    // Parse JSON (strip accidental markdown)
+    const cleaned = raw.replace(/^```(?:json)?/m, '').replace(/```$/m, '').trim();
+    return JSON.parse(cleaned);
+  } catch (err) {
+    console.error('Gemini API error:', err);
+    throw new Error(`Analysis failed: ${err.message}`);
+  }
 }
 
 async function generateCoverLetter({ resume, jobDescription, jobTitle, company }) {
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 1000,
-      system: `You are an expert cover letter writer. Write compelling, personalized cover letters. Be professional but not robotic. Avoid clichés. Be specific to the role and company.`,
-      messages: [{
-        role: 'user',
-        content: `Write a compelling cover letter for this job application.
+  const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
+  
+  if (!GEMINI_API_KEY) {
+    throw new Error('GEMINI_API_KEY not configured in .env file');
+  }
+
+  const prompt = `You are an expert cover letter writer. Write compelling, personalized cover letters. Be professional but not robotic. Avoid clichés. Be specific to the role and company.
+
+Write a compelling cover letter for this job application.
 
 JOB TITLE: ${jobTitle || 'the role'}
 COMPANY: ${company || 'the company'}
@@ -82,13 +128,24 @@ ${jobDescription.slice(0, 1500)}
 RESUME HIGHLIGHTS:
 ${resume.slice(0, 1500)}
 
-Write a 3-paragraph cover letter. First para: opening hook + why this role/company. Second para: 2-3 specific examples from resume matching the JD. Third para: closing with call to action. Keep it under 350 words. Do NOT use "I am writing to express my interest" or other clichés.`
-      }]
-    })
-  });
-  if (!res.ok) throw new Error('Cover letter generation failed');
-  const data = await res.json();
-  return data.content?.[0]?.text || '';
+Write a 3-paragraph cover letter:
+- First para: opening hook + why this role/company
+- Second para: 2-3 specific examples from resume matching the JD
+- Third para: closing with call to action
+
+Keep it under 350 words. Do NOT use "I am writing to express my interest" or other clichés.`;
+
+  try {
+    const { GoogleGenerativeAI } = await import('@google/generative-ai');
+    const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    
+    const result = await model.generateContent(prompt);
+    return result.response.text().trim();
+  } catch (err) {
+    console.error('Gemini API error:', err);
+    throw new Error(`Cover letter generation failed: ${err.message}`);
+  }
 }
 
 // ── Match Score Ring ──────────────────────────────────────────────────────────

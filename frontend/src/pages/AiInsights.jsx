@@ -4,23 +4,34 @@ import '../styles/AIInsights.css';
 
 const CLAUDE_API = 'https://api.anthropic.com/v1/messages';
 
-async function callClaude(system, userMsg, maxTokens = 1000) {
-  const res = await fetch(CLAUDE_API, {
+// At the top of the file, replace the callClaude function:
+async function callGemini(systemPrompt, userMsg, maxTokens = 1000) {
+  const res = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=' + import.meta.env.VITE_GEMINI_API_KEY, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: maxTokens,
-      system,
-      messages: [{ role: 'user', content: userMsg }],
+      contents: [{
+        parts: [{
+          text: `${systemPrompt}\n\n${userMsg}`
+        }]
+      }],
+      generationConfig: {
+        temperature: 0.7,
+        maxOutputTokens: maxTokens,
+      }
     }),
   });
-  if (!res.ok) throw new Error(`AI call failed: ${res.status}`);
+  
+  if (!res.ok) {
+    const error = await res.json();
+    throw new Error(`Gemini API call failed: ${error.error?.message || res.status}`);
+  }
+  
   const data = await res.json();
-  return data.content?.[0]?.text || '';
+  return data.candidates?.[0]?.content?.parts?.[0]?.text || '';
 }
 
-// ── Insight generators ────────────────────────────────────────────────────────
+// Then update all the generator functions to use callGemini instead of callClaude:
 
 async function generatePipelineHealth(jobs, analytics) {
   const summary = `
@@ -34,11 +45,11 @@ Recent activity (last 5):
 ${jobs.slice(0, 5).map(j => `- ${j.title} at ${j.company} (${j.status}, ${new Date(j.createdAt).toLocaleDateString()})`).join('\n')}
 `.trim();
 
-  const text = await callClaude(
-    `You are an expert career coach analysing a job seeker's pipeline. Be specific, honest, and actionable. Respond ONLY with raw JSON, no markdown.`,
+  const text = await callGemini(
+    `You are an expert career coach analyzing a job seeker's pipeline. Be specific, honest, and actionable.`,
     `Here is a summary of this person's job search pipeline:\n${summary}
 
-Respond with JSON:
+Respond ONLY with valid JSON (no markdown, no backticks):
 {
   "healthScore": <integer 0-100>,
   "healthLabel": "Excellent" | "Good" | "Needs work" | "Critical",
@@ -49,6 +60,7 @@ Respond with JSON:
 }`,
     600
   );
+  
   return JSON.parse(text.replace(/```json|```/g, '').trim());
 }
 
@@ -58,11 +70,11 @@ async function generateRolePatterns(jobs) {
     `${j.title} at ${j.company} → Status: ${j.status}, Risk: ${j.analysis?.verdict || 'N/A'}`
   ).join('\n');
 
-  const text = await callClaude(
-    `You are a career strategist. Identify patterns in a job seeker's applications. Respond ONLY with raw JSON, no markdown.`,
+  const text = await callGemini(
+    `You are a career strategist. Identify patterns in a job seeker's applications.`,
     `Applications:\n${list}
 
-Respond with JSON:
+Respond ONLY with valid JSON (no markdown, no backticks):
 {
   "targetRoles": ["<role type they seem to be targeting>"],
   "patternInsight": "<2 sentences about what kinds of roles/companies they're applying to and whether this is strategic>",
@@ -71,18 +83,8 @@ Respond with JSON:
   "diversificationAdvice": "<1 sentence on whether they should broaden or narrow their search>"
 }`
   );
+  
   return JSON.parse(text.replace(/```json|```/g, '').trim());
-}
-
-async function generateScamInsights(jobs) {
-  const analyzed = jobs.filter(j => j.analysis?.verdict && j.analysis.verdict !== 'UNKNOWN');
-  if (analyzed.length === 0) return null;
-
-  const fakeCount = analyzed.filter(j => j.analysis.verdict === 'FAKE').length;
-  const suspiciousCount = analyzed.filter(j => j.analysis.verdict === 'SUSPICIOUS').length;
-  const avgRisk = Math.round(analyzed.reduce((s, j) => s + (j.analysis.riskScore || 0), 0) / analyzed.length);
-
-  return { fakeCount, suspiciousCount, avgRisk, analyzed: analyzed.length };
 }
 
 async function generateWeeklyPlan(jobs, analytics) {
@@ -91,8 +93,8 @@ async function generateWeeklyPlan(jobs, analytics) {
     new Date() - new Date(j.appliedDate || j.createdAt) > 7 * 86400000
   ).slice(0, 5);
 
-  const text = await callClaude(
-    `You are a career coach creating a weekly action plan. Be very specific and actionable. Respond ONLY with raw JSON, no markdown.`,
+  const text = await callGemini(
+    `You are a career coach creating a weekly action plan. Be very specific and actionable.`,
     `Pipeline stats:
 - ${analytics.total} total jobs tracked, ${analytics.interviews} interviews, ${analytics.offers} offers
 - ${stalled.length} applications stalled (applied 7+ days ago, no update)
@@ -101,7 +103,7 @@ async function generateWeeklyPlan(jobs, analytics) {
 Stalled applications:
 ${stalled.map(j => `- ${j.title} at ${j.company}`).join('\n') || 'None'}
 
-Create a specific 5-item weekly action plan:
+Create a specific 5-item weekly action plan. Respond ONLY with valid JSON (no markdown, no backticks):
 {
   "weekOf": "<week description>",
   "actions": [
@@ -114,6 +116,7 @@ Create a specific 5-item weekly action plan:
 }`,
     700
   );
+  
   return JSON.parse(text.replace(/```json|```/g, '').trim());
 }
 
