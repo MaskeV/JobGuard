@@ -1,9 +1,11 @@
-const { GoogleGenerativeAI } = require('@google/generative-ai');
+const OpenAI = require('openai');
 const axios   = require('axios');
 const cheerio = require('cheerio');
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+const client = new OpenAI({
+  baseURL: 'https://api.deepseek.com',
+  apiKey: process.env.DEEPSEEK_API_KEY,
+});
 
 // ── Scraper ────────────────────────────────────────────────────────────────────
 async function scrapeJobPage(url) {
@@ -179,23 +181,20 @@ function detectPlatform(url = '') {
   return 'Other';
 }
 
-// ── Main Analyze Function ──────────────────────────────────────────────────────
 async function analyzeJobListing({ url, title, company, description, salary, location }) {
-  // Step 1: Scrape the URL
   const scraped = await scrapeJobPage(url);
+  const prompt = buildPrompt({ url, scraped, manualData: { title, company, description, salary, location } });
 
-  // Step 2: Build prompt
-  const prompt = buildPrompt({
-    url,
-    scraped,
-    manualData: { title, company, description, salary, location },
+  const completion = await client.chat.completions.create({
+    model: 'deepseek-chat',
+    messages: [
+      { role: 'system', content: 'You are an expert in detecting fraudulent job listings. Respond ONLY with raw JSON, no markdown.' },
+      { role: 'user', content: prompt },
+    ],
+    max_tokens: 1000,
   });
 
-  // Step 3: Call Gemini
-  const result = await model.generateContent(prompt);
-  const raw = result.response.text().trim();
-
-  // Step 4: Parse JSON (strip accidental markdown)
+  const raw = completion.choices[0].message.content.trim();
   const cleaned = raw.replace(/^```(?:json)?/m, '').replace(/```$/m, '').trim();
   const parsed = JSON.parse(cleaned);
 

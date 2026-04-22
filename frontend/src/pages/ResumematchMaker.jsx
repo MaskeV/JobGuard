@@ -1,153 +1,16 @@
 import { useState } from 'react';
 import '../styles/ResumematchMaker.css';
 
-const API_BASE = import.meta.env.VITE_APP_API_URL || 'http://localhost:5000/api';
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
-// Replace these two functions in ResumematchMaker.jsx
+import { analyzeResumeMatch, generateCoverLetter as generateCoverLetterAPI } from '../services/api';
 
 async function analyzeMatch({ resume, jobDescription, jobTitle, company }) {
-  const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
-  
-  if (!GEMINI_API_KEY) {
-    throw new Error('GEMINI_API_KEY not configured in .env file');
-  }
-
-  const prompt = `You are an expert career coach and ATS specialist. Analyze resume-job fit and respond ONLY with a valid JSON object, no markdown.
-
-JOB TITLE: ${jobTitle || 'Not specified'}
-COMPANY: ${company || 'Not specified'}
-
-JOB DESCRIPTION:
-${jobDescription.slice(0, 2000)}
-
-RESUME:
-${resume.slice(0, 2000)}
-
-Respond with ONLY this JSON (no markdown, no backticks):
-{
-  "matchScore": <integer 0-100>,
-  "matchLevel": "Excellent" | "Good" | "Fair" | "Poor",
-  "summary": "<2-3 sentence overall assessment>",
-  "strengths": ["<strength 1>", "<strength 2>", "<strength 3>"],
-  "gaps": ["<missing skill/exp 1>", "<gap 2>"],
-  "keywords": {
-    "matched": ["<keyword found in both>"],
-    "missing": ["<keyword in JD not in resume>"]
-  },
-  "atsScore": <integer 0-100>,
-  "suggestions": ["<specific improvement 1>", "<improvement 2>", "<improvement 3>"]
-}`;
-
-  try {
-    const { GoogleGenerativeAI } = await import('@google/generative-ai');
-    const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
-    
-    const result = await model.generateContent(prompt);
-    const raw = result.response.text().trim();
-    
-    // Parse JSON (strip accidental markdown)
-    const cleaned = raw.replace(/^```(?:json)?/m, '').replace(/```$/m, '').trim();
-    return JSON.parse(cleaned);
-  } catch (err) {
-    console.error('Gemini API error:', err);
-    throw new Error(`Analysis failed: ${err.message}`);
-  }
-}
-
-// Replace these two functions in ResumematchMaker.jsx
-
-async function analyzeMatch({ resume, jobDescription, jobTitle, company }) {
-  const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
-  
-  if (!GEMINI_API_KEY) {
-    throw new Error('GEMINI_API_KEY not configured in .env file');
-  }
-
-  const prompt = `You are an expert career coach and ATS specialist. Analyze resume-job fit and respond ONLY with a valid JSON object, no markdown.
-
-JOB TITLE: ${jobTitle || 'Not specified'}
-COMPANY: ${company || 'Not specified'}
-
-JOB DESCRIPTION:
-${jobDescription.slice(0, 2000)}
-
-RESUME:
-${resume.slice(0, 2000)}
-
-Respond with ONLY this JSON (no markdown, no backticks):
-{
-  "matchScore": <integer 0-100>,
-  "matchLevel": "Excellent" | "Good" | "Fair" | "Poor",
-  "summary": "<2-3 sentence overall assessment>",
-  "strengths": ["<strength 1>", "<strength 2>", "<strength 3>"],
-  "gaps": ["<missing skill/exp 1>", "<gap 2>"],
-  "keywords": {
-    "matched": ["<keyword found in both>"],
-    "missing": ["<keyword in JD not in resume>"]
-  },
-  "atsScore": <integer 0-100>,
-  "suggestions": ["<specific improvement 1>", "<improvement 2>", "<improvement 3>"]
-}`;
-
-  try {
-    const { GoogleGenerativeAI } = await import('@google/generative-ai');
-    const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
-    
-    const result = await model.generateContent(prompt);
-    const raw = result.response.text().trim();
-    
-    // Parse JSON (strip accidental markdown)
-    const cleaned = raw.replace(/^```(?:json)?/m, '').replace(/```$/m, '').trim();
-    return JSON.parse(cleaned);
-  } catch (err) {
-    console.error('Gemini API error:', err);
-    throw new Error(`Analysis failed: ${err.message}`);
-  }
+  return await analyzeResumeMatch({ resume, jobDescription, jobTitle, company });
 }
 
 async function generateCoverLetter({ resume, jobDescription, jobTitle, company }) {
-  const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
-  
-  if (!GEMINI_API_KEY) {
-    throw new Error('GEMINI_API_KEY not configured in .env file');
-  }
-
-  const prompt = `You are an expert cover letter writer. Write compelling, personalized cover letters. Be professional but not robotic. Avoid clichés. Be specific to the role and company.
-
-Write a compelling cover letter for this job application.
-
-JOB TITLE: ${jobTitle || 'the role'}
-COMPANY: ${company || 'the company'}
-
-JOB DESCRIPTION (key parts):
-${jobDescription.slice(0, 1500)}
-
-RESUME HIGHLIGHTS:
-${resume.slice(0, 1500)}
-
-Write a 3-paragraph cover letter:
-- First para: opening hook + why this role/company
-- Second para: 2-3 specific examples from resume matching the JD
-- Third para: closing with call to action
-
-Keep it under 350 words. Do NOT use "I am writing to express my interest" or other clichés.`;
-
-  try {
-    const { GoogleGenerativeAI } = await import('@google/generative-ai');
-    const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
-    
-    const result = await model.generateContent(prompt);
-    return result.response.text().trim();
-  } catch (err) {
-    console.error('Gemini API error:', err);
-    throw new Error(`Cover letter generation failed: ${err.message}`);
-  }
+  const result = await generateCoverLetterAPI({ resume, jobDescription, jobTitle, company });
+  return result.coverLetter;
 }
-
 // ── Match Score Ring ──────────────────────────────────────────────────────────
 function ScoreRing({ score, level }) {
   const r = 54;
