@@ -27,3 +27,12 @@ export const scanEmails   = (body)    => request('POST', '/email/scan', body);
 
 export const searchJobs   = (body)    => request('POST', '/search/jobs', body);
 export const parseResume  = (text)    => request('POST', '/search/resume', { resumeText: text });
+
+export const generateAIInsights = (type, jobs, analytics) => 
+  request('POST', '/ai/insights', { type, jobs, analytics });
+
+export const analyzeResumeMatch = (body) => 
+  request('POST', '/ai/resume-match', body);
+
+export const generateCoverLetter = (body) => 
+  request('POST', '/ai/cover-letter', body);

@@ -1,151 +1,54 @@
 import { useState } from 'react';
 import '../styles/ResumematchMaker.css';
 
-const API_BASE = import.meta.env.VITE_APP_API_URL || 'http://localhost:5000/api';
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
-// Replace these two functions in ResumematchMaker.jsx
+import { analyzeResumeMatch, generateCoverLetter as generateCoverLetterAPI } from '../services/api';
 
 async function analyzeMatch({ resume, jobDescription, jobTitle, company }) {
-  const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
-  
-  if (!GEMINI_API_KEY) {
-    throw new Error('GEMINI_API_KEY not configured in .env file');
-  }
-
-  const prompt = `You are an expert career coach and ATS specialist. Analyze resume-job fit and respond ONLY with a valid JSON object, no markdown.
-
-JOB TITLE: ${jobTitle || 'Not specified'}
-COMPANY: ${company || 'Not specified'}
-
-JOB DESCRIPTION:
-${jobDescription.slice(0, 2000)}
-
-RESUME:
-${resume.slice(0, 2000)}
-
-Respond with ONLY this JSON (no markdown, no backticks):
-{
-  "matchScore": <integer 0-100>,
-  "matchLevel": "Excellent" | "Good" | "Fair" | "Poor",
-  "summary": "<2-3 sentence overall assessment>",
-  "strengths": ["<strength 1>", "<strength 2>", "<strength 3>"],
-  "gaps": ["<missing skill/exp 1>", "<gap 2>"],
-  "keywords": {
-    "matched": ["<keyword found in both>"],
-    "missing": ["<keyword in JD not in resume>"]
-  },
-  "atsScore": <integer 0-100>,
-  "suggestions": ["<specific improvement 1>", "<improvement 2>", "<improvement 3>"]
-}`;
-
-  try {
-    const { GoogleGenerativeAI } = await import('@google/generative-ai');
-    const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
-    
-    const result = await model.generateContent(prompt);
-    const raw = result.response.text().trim();
-    
-    // Parse JSON (strip accidental markdown)
-    const cleaned = raw.replace(/^```(?:json)?/m, '').replace(/```$/m, '').trim();
-    return JSON.parse(cleaned);
-  } catch (err) {
-    console.error('Gemini API error:', err);
-    throw new Error(`Analysis failed: ${err.message}`);
-  }
-}
-
-// Replace these two functions in ResumematchMaker.jsx
-
-async function analyzeMatch({ resume, jobDescription, jobTitle, company }) {
-  const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
-  
-  if (!GEMINI_API_KEY) {
-    throw new Error('GEMINI_API_KEY not configured in .env file');
-  }
-
-  const prompt = `You are an expert career coach and ATS specialist. Analyze resume-job fit and respond ONLY with a valid JSON object, no markdown.
-
-JOB TITLE: ${jobTitle || 'Not specified'}
-COMPANY: ${company || 'Not specified'}
-
-JOB DESCRIPTION:
-${jobDescription.slice(0, 2000)}
-
-RESUME:
-${resume.slice(0, 2000)}
-
-Respond with ONLY this JSON (no markdown, no backticks):
-{
-  "matchScore": <integer 0-100>,
-  "matchLevel": "Excellent" | "Good" | "Fair" | "Poor",
-  "summary": "<2-3 sentence overall assessment>",
-  "strengths": ["<strength 1>", "<strength 2>", "<strength 3>"],
-  "gaps": ["<missing skill/exp 1>", "<gap 2>"],
-  "keywords": {
-    "matched": ["<keyword found in both>"],
-    "missing": ["<keyword in JD not in resume>"]
-  },
-  "atsScore": <integer 0-100>,
-  "suggestions": ["<specific improvement 1>", "<improvement 2>", "<improvement 3>"]
-}`;
-
-  try {
-    const { GoogleGenerativeAI } = await import('@google/generative-ai');
-    const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
-    
-    const result = await model.generateContent(prompt);
-    const raw = result.response.text().trim();
-    
-    // Parse JSON (strip accidental markdown)
-    const cleaned = raw.replace(/^```(?:json)?/m, '').replace(/```$/m, '').trim();
-    return JSON.parse(cleaned);
-  } catch (err) {
-    console.error('Gemini API error:', err);
-    throw new Error(`Analysis failed: ${err.message}`);
-  }
+  return await analyzeResumeMatch({ resume, jobDescription, jobTitle, company });
 }
 
 async function generateCoverLetter({ resume, jobDescription, jobTitle, company }) {
-  const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
+  const result = await generateCoverLetterAPI({ resume, jobDescription, jobTitle, company });
+  return result.coverLetter;
+}
+
+// ── File Upload & Text Extraction ────────────────────────────────────────────
+async function extractTextFromFile(file) {
+  const fileType = file.type;
   
-  if (!GEMINI_API_KEY) {
-    throw new Error('GEMINI_API_KEY not configured in .env file');
+  if (fileType === 'application/pdf') {
+    return await extractTextFromPDF(file);
+  } else if (fileType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || 
+             fileType === 'application/msword') {
+    return await extractTextFromDOCX(file);
+  } else if (fileType === 'text/plain') {
+    return await file.text();
+  } else {
+    throw new Error('Unsupported file type. Please upload PDF, DOCX, or TXT files.');
   }
+}
 
-  const prompt = `You are an expert cover letter writer. Write compelling, personalized cover letters. Be professional but not robotic. Avoid clichés. Be specific to the role and company.
-
-Write a compelling cover letter for this job application.
-
-JOB TITLE: ${jobTitle || 'the role'}
-COMPANY: ${company || 'the company'}
-
-JOB DESCRIPTION (key parts):
-${jobDescription.slice(0, 1500)}
-
-RESUME HIGHLIGHTS:
-${resume.slice(0, 1500)}
-
-Write a 3-paragraph cover letter:
-- First para: opening hook + why this role/company
-- Second para: 2-3 specific examples from resume matching the JD
-- Third para: closing with call to action
-
-Keep it under 350 words. Do NOT use "I am writing to express my interest" or other clichés.`;
-
-  try {
-    const { GoogleGenerativeAI } = await import('@google/generative-ai');
-    const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
-    
-    const result = await model.generateContent(prompt);
-    return result.response.text().trim();
-  } catch (err) {
-    console.error('Gemini API error:', err);
-    throw new Error(`Cover letter generation failed: ${err.message}`);
+async function extractTextFromPDF(file) {
+  // Using PDF.js from CDN
+  const arrayBuffer = await file.arrayBuffer();
+  const pdf = await window.pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+  let fullText = '';
+  
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const page = await pdf.getPage(i);
+    const textContent = await page.getTextContent();
+    const pageText = textContent.items.map(item => item.str).join(' ');
+    fullText += pageText + '\n\n';
   }
+  
+  return fullText.trim();
+}
+
+async function extractTextFromDOCX(file) {
+  // Using mammoth.js from CDN
+  const arrayBuffer = await file.arrayBuffer();
+  const result = await window.mammoth.extractRawText({ arrayBuffer });
+  return result.value;
 }
 
 // ── Match Score Ring ──────────────────────────────────────────────────────────
@@ -196,11 +99,31 @@ export default function ResumeMatcher() {
 
   const [loading, setLoading] = useState(false);
   const [coverLoading, setCoverLoading] = useState(false);
+  const [uploadLoading, setUploadLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [coverLetter, setCoverLetter] = useState('');
   const [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
   const [activeTab, setActiveTab] = useState('match'); // 'match' | 'cover'
+  const [uploadedFileName, setUploadedFileName] = useState('');
+
+  async function handleFileUpload(event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setUploadLoading(true);
+    setError('');
+    
+    try {
+      const text = await extractTextFromFile(file);
+      setResume(text);
+      setUploadedFileName(file.name);
+    } catch (err) {
+      setError(`Failed to extract text from file: ${err.message}`);
+    } finally {
+      setUploadLoading(false);
+    }
+  }
 
   async function handleAnalyze() {
     if (!resume.trim() || !jobDesc.trim()) {
@@ -246,7 +169,7 @@ export default function ResumeMatcher() {
       {/* Header */}
       <header className="matcher__header fade-up">
         <div className="matcher__logo">
-          <span>🎯</span>
+          <span></span>
           <div>
             <div className="matcher__title">Resume Matcher</div>
             <div className="matcher__sub">AI-powered resume vs job description fit analysis</div>
@@ -258,9 +181,31 @@ export default function ResumeMatcher() {
       <div className="matcher__inputs fade-up d1">
         <div className="matcher__input-col">
           <div className="input-header">
-            <label className="input-label">📄 Your Resume</label>
+            <label className="input-label"> Your Resume</label>
             <span className="input-count">{resume.length > 0 ? `${resume.length} chars` : ''}</span>
           </div>
+          
+          {/* File Upload Button */}
+          <div className="file-upload-section">
+            <label className="file-upload-btn">
+              {uploadLoading ? (
+                <><span className="btn-spinner btn-spinner--small" />Extracting text...</>
+              ) : (
+                <>📎 Upload Resume (PDF/DOCX/TXT)</>
+              )}
+              <input
+                type="file"
+                accept=".pdf,.docx,.doc,.txt"
+                onChange={handleFileUpload}
+                disabled={uploadLoading}
+                style={{ display: 'none' }}
+              />
+            </label>
+            {uploadedFileName && (
+              <span className="uploaded-file-name">✓ {uploadedFileName}</span>
+            )}
+          </div>
+
           <textarea
             className="matcher__textarea"
             placeholder="Paste your full resume text here — work experience, skills, education, everything..."
@@ -272,7 +217,7 @@ export default function ResumeMatcher() {
 
         <div className="matcher__input-col">
           <div className="input-header">
-            <label className="input-label">💼 Job Description</label>
+            <label className="input-label"> Job Description</label>
             <span className="input-count">{jobDesc.length > 0 ? `${jobDesc.length} chars` : ''}</span>
           </div>
           <div className="matcher__job-meta">
@@ -301,7 +246,7 @@ export default function ResumeMatcher() {
 
       {/* Error */}
       {error && (
-        <div className="matcher__error fade-up">⚠️ {error}</div>
+        <div className="matcher__error fade-up"> {error}</div>
       )}
 
       {/* Analyze button */}
@@ -324,10 +269,10 @@ export default function ResumeMatcher() {
           {/* Tabs */}
           <div className="result-tabs">
             <button className={`result-tab ${activeTab === 'match' ? 'result-tab--active' : ''}`} onClick={() => setActiveTab('match')}>
-              📊 Match Analysis
+               Match Analysis
             </button>
             <button className={`result-tab ${activeTab === 'cover' ? 'result-tab--active' : ''}`} onClick={() => setActiveTab('cover')}>
-              ✍️ Cover Letter
+               Cover Letter
               {!coverLetter && <span className="result-tab__new">Generate</span>}
             </button>
           </div>
@@ -366,7 +311,7 @@ export default function ResumeMatcher() {
                   </ul>
                 </div>
                 <div className="match-section match-section--red">
-                  <div className="match-section__title">⚠️ Gaps to address</div>
+                  <div className="match-section__title"> Gaps to address</div>
                   <ul className="match-list">
                     {result.gaps?.length ? result.gaps.map((g, i) => <li key={i}>{g}</li>) : <li>No significant gaps found</li>}
                   </ul>

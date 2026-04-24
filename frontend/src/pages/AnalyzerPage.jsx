@@ -285,7 +285,7 @@ export default function AnalyzerPage() {
                 </div>
               </div>
               <div className="details-tip">
-                💡 Extra details help Model-check salary reasonability, location consistency, and company legitimacy
+                Extra details help Model-check salary reasonability, location consistency, and company legitimacy
               </div>
             </div>
           )}
@@ -293,7 +293,7 @@ export default function AnalyzerPage() {
           {/* Error */}
           {error && (
             <div className="error-box fade-up">
-              <span>⚠️</span> {error}
+              <span></span> {error}
             </div>
           )}
 

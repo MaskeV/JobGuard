@@ -9,7 +9,7 @@ const PLATFORMS = [
   { id: 'internshala', name: 'Internshala', icon: '🎓' },
   { id: 'foundit', name: 'Foundit', icon: '🔎' },
 ];
-
+t
 const JOB_TYPES = ['Full-time', 'Part-time', 'Contract', 'Internship', 'Freelance'];
 const EXPERIENCE_LEVELS = ['Entry Level', '1-3 years', '3-5 years', '5-10 years', '10+ years'];
 

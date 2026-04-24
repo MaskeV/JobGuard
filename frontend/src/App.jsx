@@ -11,8 +11,8 @@ export default function App() {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    console.log('✅ App component mounted');
-    console.log('📍 Current page:', page);
+    console.log(' App component mounted');
+    console.log(' Current page:', page);
   }, [page]);
 
   if (error) {
@@ -25,7 +25,7 @@ export default function App() {
         minHeight: '100vh',
         background: '#060910'
       }}>
-        <h1 style={{ marginBottom: '20px' }}>⚠️ Error Loading App</h1>
+        <h1 style={{ marginBottom: '20px' }}> Error Loading App</h1>
         <pre style={{ 
           background: 'rgba(248,113,113,0.1)', 
           padding: '20px', 
@@ -57,7 +57,7 @@ export default function App() {
               className={`app-nav__tab ${page === 'analyzer' ? 'app-nav__tab--active' : ''}`}
               onClick={() => setPage('analyzer')}
             >
-              <span>🔍</span>
+              <span></span>
               <span>Analyzer</span>
             </button>
             
@@ -65,7 +65,7 @@ export default function App() {
               className={`app-nav__tab ${page === 'dashboard' ? 'app-nav__tab--active' : ''}`}
               onClick={() => setPage('dashboard')}
             >
-              <span>📊</span>
+              <span></span>
               <span>Dashboard</span>
             </button>
 
@@ -73,7 +73,7 @@ export default function App() {
               className={`app-nav__tab ${page === 'search' ? 'app-nav__tab--active' : ''}`}
               onClick={() => setPage('search')}
             >
-              <span>🔎</span>
+              <span></span>
               <span>Job Search</span>
             </button>
 
@@ -81,7 +81,7 @@ export default function App() {
               className={`app-nav__tab ${page === 'insights' ? 'app-nav__tab--active' : ''}`}
               onClick={() => setPage('insights')}
             >
-              <span>✦</span>
+              <span></span>
               <span>AI Insights</span>
             </button>
 
@@ -89,7 +89,7 @@ export default function App() {
               className={`app-nav__tab ${page === 'matcher' ? 'app-nav__tab--active' : ''}`}
               onClick={() => setPage('matcher')}
             >
-              <span>🎯</span>
+              <span></span>
               <span>Resume Match</span>
             </button>
           </div>
@@ -106,7 +106,7 @@ export default function App() {
       </div>
     );
   } catch (err) {
-    console.error('❌ App render error:', err);
+    console.error(' App render error:', err);
     setError(err);
     return null;
   }

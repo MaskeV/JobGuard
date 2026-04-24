@@ -1,164 +1,31 @@
-import { useState, useEffect } from 'react';
-import { getJobs, getAnalytics } from '../services/api';
-import '../styles/AIInsights.css';
+import { generateAIInsights } from '../services/api';
+import { useState } from 'react';
+import '../styles/AiInsights.css';
 
-const CLAUDE_API = 'https://api.anthropic.com/v1/messages';
-
-// At the top of the file, replace the callClaude function:
-async function callGemini(systemPrompt, userMsg, maxTokens = 1000) {
-  const res = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=' + import.meta.env.VITE_GEMINI_API_KEY, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      contents: [{
-        parts: [{
-          text: `${systemPrompt}\n\n${userMsg}`
-        }]
-      }],
-      generationConfig: {
-        temperature: 0.7,
-        maxOutputTokens: maxTokens,
-      }
-    }),
-  });
-  
-  if (!res.ok) {
-    const error = await res.json();
-    throw new Error(`Gemini API call failed: ${error.error?.message || res.status}`);
-  }
-  
-  const data = await res.json();
-  return data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-}
-
-// Then update all the generator functions to use callGemini instead of callClaude:
+// Remove the callGemini function entirely
 
 async function generatePipelineHealth(jobs, analytics) {
-  const summary = `
-Total applications: ${analytics.total}
-Applied: ${analytics.applied}, Interviews: ${analytics.interviews}, Offers: ${analytics.offers}
-Response rate: ${analytics.responseRate}%
-Avg risk score: ${analytics.avgRiskScore}
-Status breakdown: ${JSON.stringify(analytics.byStatus)}
-Platform breakdown: ${JSON.stringify(analytics.byPlatform)}
-Recent activity (last 5):
-${jobs.slice(0, 5).map(j => `- ${j.title} at ${j.company} (${j.status}, ${new Date(j.createdAt).toLocaleDateString()})`).join('\n')}
-`.trim();
-
-  const text = await callGemini(
-    `You are an expert career coach analyzing a job seeker's pipeline. Be specific, honest, and actionable.`,
-    `Here is a summary of this person's job search pipeline:\n${summary}
-
-Respond ONLY with valid JSON (no markdown, no backticks):
-{
-  "healthScore": <integer 0-100>,
-  "healthLabel": "Excellent" | "Good" | "Needs work" | "Critical",
-  "headline": "<1 sentence sharp diagnosis of their pipeline>",
-  "positives": ["<specific positive pattern>", "<another>"],
-  "concerns": ["<specific concern>", "<another>"],
-  "topAction": "<the single most impactful thing they should do this week>"
-}`,
-    600
-  );
-  
-  return JSON.parse(text.replace(/```json|```/g, '').trim());
+  return await generateAIInsights('pipeline-health', jobs, analytics);
 }
 
 async function generateRolePatterns(jobs) {
   if (jobs.length < 2) return null;
-  const list = jobs.slice(0, 20).map(j =>
-    `${j.title} at ${j.company} → Status: ${j.status}, Risk: ${j.analysis?.verdict || 'N/A'}`
-  ).join('\n');
-
-  const text = await callGemini(
-    `You are a career strategist. Identify patterns in a job seeker's applications.`,
-    `Applications:\n${list}
-
-Respond ONLY with valid JSON (no markdown, no backticks):
-{
-  "targetRoles": ["<role type they seem to be targeting>"],
-  "patternInsight": "<2 sentences about what kinds of roles/companies they're applying to and whether this is strategic>",
-  "roleRecommendations": ["<specific role title to explore>", "<another>", "<another>"],
-  "companyTypeInsight": "<1 sentence about their company preferences (startup/big tech/etc) and if it's working>",
-  "diversificationAdvice": "<1 sentence on whether they should broaden or narrow their search>"
-}`
-  );
-  
-  return JSON.parse(text.replace(/```json|```/g, '').trim());
+  return await generateAIInsights('role-patterns', jobs, null);
 }
 
 async function generateWeeklyPlan(jobs, analytics) {
-  const stalled = jobs.filter(j =>
-    j.status === 'Applied' &&
-    new Date() - new Date(j.appliedDate || j.createdAt) > 7 * 86400000
-  ).slice(0, 5);
-
-  const text = await callGemini(
-    `You are a career coach creating a weekly action plan. Be very specific and actionable.`,
-    `Pipeline stats:
-- ${analytics.total} total jobs tracked, ${analytics.interviews} interviews, ${analytics.offers} offers
-- ${stalled.length} applications stalled (applied 7+ days ago, no update)
-- Response rate: ${analytics.responseRate}%
-
-Stalled applications:
-${stalled.map(j => `- ${j.title} at ${j.company}`).join('\n') || 'None'}
-
-Create a specific 5-item weekly action plan. Respond ONLY with valid JSON (no markdown, no backticks):
-{
-  "weekOf": "<week description>",
-  "actions": [
-    { "day": "Monday", "action": "<specific action>", "why": "<why this matters>", "timeEstimate": "<e.g. 30 min>" },
-    { "day": "Tuesday", "action": "<specific action>", "why": "<why>", "timeEstimate": "<time>" },
-    { "day": "Wednesday", "action": "<specific action>", "why": "<why>", "timeEstimate": "<time>" },
-    { "day": "Thursday", "action": "<specific action>", "why": "<why>", "timeEstimate": "<time>" },
-    { "day": "Friday", "action": "<specific action>", "why": "<why>", "timeEstimate": "<time>" }
-  ]
-}`,
-    700
-  );
-  
-  return JSON.parse(text.replace(/```json|```/g, '').trim());
+  return await generateAIInsights('weekly-plan', jobs, analytics);
 }
 
-// ── Sub-components ────────────────────────────────────────────────────────────
-
-function HealthGauge({ score, label }) {
-  const color = score >= 75 ? '#34d399' : score >= 50 ? '#63b3ed' : score >= 30 ? '#fbbf24' : '#f87171';
-  const r = 60;
-  const circ = Math.PI * r; // semicircle
-  const offset = circ - (score / 100) * circ;
-
-  return (
-    <div className="health-gauge">
-      <svg width="160" height="90" viewBox="0 0 160 90">
-        <path d="M 20 80 A 60 60 0 0 1 140 80" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="12" strokeLinecap="round" />
-        <path
-          d="M 20 80 A 60 60 0 0 1 140 80"
-          fill="none" stroke={color} strokeWidth="12"
-          strokeLinecap="round"
-          strokeDasharray={`${circ}`}
-          strokeDashoffset={offset}
-          style={{ transition: 'stroke-dashoffset 1.4s cubic-bezier(0.34,1.56,0.64,1)' }}
-        />
-      </svg>
-      <div className="health-gauge__val" style={{ color }}>{score}</div>
-      <div className="health-gauge__label" style={{ color }}>{label}</div>
-    </div>
-  );
+async function generateScamInsights(jobs) {
+  const analyzed = jobs.filter(j => j.analysis?.verdict);
+  return {
+    fakeCount: analyzed.filter(j => j.analysis.verdict === 'FAKE').length,
+    suspiciousCount: analyzed.filter(j => j.analysis.verdict === 'SUSPICIOUS').length,
+    avgRisk: Math.round(analyzed.reduce((sum, j) => sum + (j.analysis.riskScore || 0), 0) / (analyzed.length || 1)),
+    analyzed: analyzed.length,
+  };
 }
-
-function InsightCard({ icon, title, children, accent }) {
-  return (
-    <div className="insight-card" style={{ borderColor: accent ? `${accent}30` : undefined, background: accent ? `${accent}06` : undefined }}>
-      <div className="insight-card__header">
-        <span className="insight-card__icon">{icon}</span>
-        <span className="insight-card__title">{title}</span>
-      </div>
-      <div className="insight-card__body">{children}</div>
-    </div>
-  );
-}
-
 function LoadingCard({ title }) {
   return (
     <div className="insight-card insight-card--loading">
@@ -353,7 +220,7 @@ export default function AIInsights() {
           {healthLoading ? (
             <LoadingCard title="Pipeline health" />
           ) : health ? (
-            <InsightCard icon="📊" title="Pipeline health" accent={health.healthScore >= 60 ? '#34d399' : '#f87171'}>
+            <InsightCard  title="Pipeline health" accent={health.healthScore >= 60 ? '#34d399' : '#f87171'}>
               <div className="health-row">
                 <HealthGauge score={health.healthScore} label={health.healthLabel} />
                 <div className="health-details">

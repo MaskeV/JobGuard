@@ -215,7 +215,7 @@ export default function AnalyzerPage() {
               🔗 Job URL
             </button>
             <button className={`tab-btn ${activeTab === 'details' ? 'tab-btn--active' : ''}`} onClick={() => setTab('details')}>
-              📝 Extra Details
+             Extra Details
               <span className="tab-btn__badge">boosts accuracy</span>
             </button>
           </div>
@@ -293,7 +293,7 @@ export default function AnalyzerPage() {
                 </div>
               </div>
               <div className="details-tip">
-                💡 Extra details help Model cross-check salary reasonability, location consistency, and company legitimacy
+                 Extra details help Model cross-check salary reasonability, location consistency, and company legitimacy
               </div>
             </div>
           )}
@@ -301,7 +301,7 @@ export default function AnalyzerPage() {
           {/* Error */}
           {error && (
             <div className="error-box fade-up">
-              <span>⚠️</span> {error}
+              <span></span> {error}
             </div>
           )}
 
@@ -338,10 +338,10 @@ export default function AnalyzerPage() {
           {!loading && !result && (
             <div className="input-footer">
               <div className="info-chips">
-                <span className="info-chip">🤖 Job Analysis Model</span>
-                <span className="info-chip">🕷️ Auto page scraper</span>
-                <span className="info-chip">⚡ ~3 sec analysis</span>
-                <span className="info-chip">🚩 10+ scam patterns</span>
+                <span className="info-chip"> Job Analysis Model</span>
+                <span className="info-chip"> Auto page scraper</span>
+                <span className="info-chip"> ~3 sec analysis</span>
+                <span className="info-chip"> 10+ scam patterns</span>
               </div>
             </div>
           )}
@@ -467,8 +467,8 @@ export default function AnalyzerPage() {
                 <div className="extracted-data">
                   <div className="extracted-data__label">Extracted from page</div>
                   <div className="extracted-data__row">
-                    {result.extractedTitle   && <span>📋 {result.extractedTitle}</span>}
-                    {result.extractedCompany && <span>🏢 {result.extractedCompany}</span>}
+                    {result.extractedTitle   && <span> {result.extractedTitle}</span>}
+                    {result.extractedCompany && <span> {result.extractedCompany}</span>}
                   </div>
                 </div>
               )}

@@ -5,6 +5,7 @@ const cors     = require('cors');
 const helmet   = require('helmet');
 const morgan   = require('morgan');
 const rateLimit = require('express-rate-limit');
+const aiRoutes = require('./routes/aiRoutes');
 
 const analyzeRoutes = require('./routes/analyze');
 const jobRoutes     = require('./routes/jobs');
@@ -43,6 +44,7 @@ app.use('/api/jobs',      jobRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/email',     emailRoutes); // NEW
 app.use('/api/search',    searchRoutes); 
+app.use('/api/ai', aiRoutes); 
 
 
 
