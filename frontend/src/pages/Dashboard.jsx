@@ -38,6 +38,15 @@ function JobCard({ job, onUpdate, onDelete, onViewAnalysis }) {
   const statusCfg = STATUS_CONFIG[job.status] || STATUS_CONFIG.Saved;
   const verdictCfg = VERDICT_CONFIG[job.analysis?.verdict] || VERDICT_CONFIG.UNKNOWN;
 
+  // Check if job has any analysis data worth showing
+  const hasAnalysis = job.analysis && (
+    job.analysis.summary || 
+    job.analysis.verdict !== 'UNKNOWN' ||
+    job.analysis.redFlags?.length > 0 ||
+    job.analysis.positiveSignals?.length > 0 ||
+    job.analysis.recommendation
+  );
+
   async function handleStatusChange(newStatus) {
     try {
       await onUpdate(job._id, { status: newStatus });
@@ -117,7 +126,7 @@ function JobCard({ job, onUpdate, onDelete, onViewAnalysis }) {
         <span className="job-card__date">
           Applied {new Date(job.appliedDate || job.createdAt).toLocaleDateString()}
         </span>
-        {job.analysis?.summary && (
+        {hasAnalysis && (
           <button className="job-card__analysis-btn" onClick={() => onViewAnalysis(job)}>
             View AI Analysis →
           </button>
@@ -394,7 +403,7 @@ export default function Dashboard() {
       </div>
 
       {/* Analysis Modal */}
-      {selectedJob && (
+      {selectedJob && selectedJob.analysis && (
         <div className="modal-overlay" onClick={() => setSelectedJob(null)}>
           <div className="modal" onClick={e => e.stopPropagation()}>
             <div className="modal__header">
@@ -403,14 +412,20 @@ export default function Dashboard() {
             </div>
             <div className="modal__body">
               <div className="analysis-detail">
-                <div className="analysis-detail__verdict" style={{ 
-                  background: `${VERDICT_CONFIG[selectedJob.analysis.verdict]?.color}15`,
-                  color: VERDICT_CONFIG[selectedJob.analysis.verdict]?.color
-                }}>
-                  {selectedJob.analysis.verdict} · {selectedJob.analysis.confidence}% confidence · Risk: {selectedJob.analysis.riskScore}/100
-                </div>
+                {selectedJob.analysis.verdict && (
+                  <div className="analysis-detail__verdict" style={{ 
+                    background: `${VERDICT_CONFIG[selectedJob.analysis.verdict]?.color || '#64748b'}15`,
+                    color: VERDICT_CONFIG[selectedJob.analysis.verdict]?.color || '#64748b'
+                  }}>
+                    {selectedJob.analysis.verdict}
+                    {selectedJob.analysis.confidence && ` · ${selectedJob.analysis.confidence}% confidence`}
+                    {selectedJob.analysis.riskScore !== undefined && ` · Risk: ${selectedJob.analysis.riskScore}/100`}
+                  </div>
+                )}
                 
-                <p className="analysis-detail__summary">{selectedJob.analysis.summary}</p>
+                {selectedJob.analysis.summary && (
+                  <p className="analysis-detail__summary">{selectedJob.analysis.summary}</p>
+                )}
                 
                 {selectedJob.analysis.redFlags?.length > 0 && (
                   <div className="analysis-section">
@@ -434,10 +449,22 @@ export default function Dashboard() {
                   </div>
                 )}
                 
-                <div className="analysis-section">
-                  <h4>💡 Recommendation</h4>
-                  <p>{selectedJob.analysis.recommendation}</p>
-                </div>
+                {selectedJob.analysis.recommendation && (
+                  <div className="analysis-section">
+                    <h4>💡 Recommendation</h4>
+                    <p>{selectedJob.analysis.recommendation}</p>
+                  </div>
+                )}
+
+                {/* Fallback if no detailed analysis available */}
+                {!selectedJob.analysis.summary && 
+                 !selectedJob.analysis.redFlags && 
+                 !selectedJob.analysis.positiveSignals && 
+                 !selectedJob.analysis.recommendation && (
+                  <div className="analysis-section">
+                    <p>Limited analysis data available for this job. The AI was able to assess a risk score of {selectedJob.analysis.riskScore || 'N/A'}/100.</p>
+                  </div>
+                )}
               </div>
             </div>
           </div>

@@ -185,26 +185,7 @@ export default function ResumeMatcher() {
             <span className="input-count">{resume.length > 0 ? `${resume.length} chars` : ''}</span>
           </div>
           
-          {/* File Upload Button */}
-          <div className="file-upload-section">
-            <label className="file-upload-btn">
-              {uploadLoading ? (
-                <><span className="btn-spinner btn-spinner--small" />Extracting text...</>
-              ) : (
-                <>📎 Upload Resume (PDF/DOCX/TXT)</>
-              )}
-              <input
-                type="file"
-                accept=".pdf,.docx,.doc,.txt"
-                onChange={handleFileUpload}
-                disabled={uploadLoading}
-                style={{ display: 'none' }}
-              />
-            </label>
-            {uploadedFileName && (
-              <span className="uploaded-file-name">✓ {uploadedFileName}</span>
-            )}
-          </div>
+          
 
           <textarea
             className="matcher__textarea"
@@ -407,10 +388,10 @@ export default function ResumeMatcher() {
         <div className="matcher__empty fade-up d3">
           <div className="empty-grid">
             {[
-              ['🎯', 'Match score 0-100%', 'See exactly how well your resume fits this role'],
-              ['🔍', 'ATS optimization', 'Know which keywords are missing from your resume'],
-              ['✅', 'Strengths & gaps', 'Understand what you bring and what to address'],
-              ['✍️', 'Cover letter AI', 'Get a tailored cover letter written for this exact role'],
+              [ 'Match score 0-100%', 'See exactly how well your resume fits this role'],
+              ['ATS optimization', 'Know which keywords are missing from your resume'],
+              [ 'Strengths & gaps', 'Understand what you bring and what to address'],
+              ['Cover letter AI', 'Get a tailored cover letter written for this exact role'],
             ].map(([icon, title, desc], i) => (
               <div key={i} className="empty-feature">
                 <div className="empty-feature__icon">{icon}</div>

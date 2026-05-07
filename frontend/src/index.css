@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@300;400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=IBM+Plex+Mono:wght@300;400;500;600&display=swap');
 
 *, *::before, *::after {
   box-sizing: border-box;
@@ -7,24 +7,24 @@
 }
 
 :root {
-  --bg:        #060910;
-  --bg2:       #0c1220;
-  --surface:   #111827;
-  --surface2:  #1a2540;
-  --border:    rgba(99, 179, 237, 0.08);
-  --border2:   rgba(99, 179, 237, 0.18);
-  --text:      #e8edf8;
-  --text2:     #8899bb;
-  --muted:     #3d4f72;
-  --accent:    #63b3ed;
-  --accent2:   #a78bfa;
-  --green:     #34d399;
-  --red:       #f87171;
-  --yellow:    #fbbf24;
-  --head:      'Outfit', sans-serif;
-  --mono:      'JetBrains Mono', monospace;
-  --radius:    14px;
-  --shadow:    0 4px 24px rgba(0,0,0,0.4);
+  --bg:        #f5f4f0;
+  --bg2:       #eeede8;
+  --surface:   #ffffff;
+  --surface2:  #f9f8f5;
+  --border:    rgba(60, 55, 45, 0.1);
+  --border2:   rgba(60, 55, 45, 0.2);
+  --text:      #1a1916;
+  --text2:     #6b6860;
+  --muted:     #a8a59e;
+  --accent:    #c1440e;
+  --accent2:   #2a7d5e;
+  --green:     #2a7d5e;
+  --red:       #c1440e;
+  --yellow:    #b07d10;
+  --head:      'Inter', sans-serif;
+  --mono:      'IBM Plex Mono', monospace;
+  --radius:    10px;
+  --shadow:    0 1px 4px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.06);
 }
 
 html { font-size: 14px; }
@@ -39,43 +39,24 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* Subtle grid pattern */
-body::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  z-index: 0;
-  background-image:
-    linear-gradient(rgba(99,179,237,0.025) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(99,179,237,0.025) 1px, transparent 1px);
-  background-size: 40px 40px;
-  pointer-events: none;
-}
-
 #root { position: relative; z-index: 1; }
 
-/* Scrollbar */
-::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar { width: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--surface2); border-radius: 99px; }
+::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 99px; }
 
-/* Selection */
-::selection { background: rgba(99,179,237,0.2); color: var(--text); }
+::selection { background: rgba(193,68,14,0.15); color: var(--text); }
 
-/* Animations */
-@keyframes fadeUp   { from { opacity:0; transform:translateY(16px) } to { opacity:1; transform:translateY(0) } }
+@keyframes fadeUp   { from { opacity:0; transform:translateY(10px) } to { opacity:1; transform:translateY(0) } }
 @keyframes fadeIn   { from { opacity:0 } to { opacity:1 } }
 @keyframes spin     { to   { transform:rotate(360deg) } }
-@keyframes pulse    { 0%,100%{opacity:1} 50%{opacity:0.4} }
+@keyframes pulse    { 0%,100%{opacity:1} 50%{opacity:0.5} }
 @keyframes shimmer  { 0%{background-position:-400px 0} 100%{background-position:400px 0} }
-@keyframes scanline { 0%{top:-4px} 100%{top:100%} }
 
-.fade-up   { animation: fadeUp  0.4s ease both; }
-.fade-in   { animation: fadeIn  0.3s ease both; }
-
-/* Delay helpers */
+.fade-up { animation: fadeUp 0.3s ease both; }
+.fade-in { animation: fadeIn 0.2s ease both; }
 .d1 { animation-delay: 0.05s; }
-.d2 { animation-delay: 0.1s;  }
+.d2 { animation-delay: 0.1s; }
 .d3 { animation-delay: 0.15s; }
-.d4 { animation-delay: 0.2s;  }
+.d4 { animation-delay: 0.2s; }
 .d5 { animation-delay: 0.25s; }

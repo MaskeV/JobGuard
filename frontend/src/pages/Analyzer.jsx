@@ -187,7 +187,7 @@ export default function AnalyzerPage() {
       {/* ── Header ── */}
       <header className="analyzer__header fade-up">
         <div className="analyzer__logo">
-          <span className="analyzer__logo-icon">🛡️</span>
+          <span className="analyzer__logo-icon"></span>
           <span className="analyzer__logo-text">JobGuard</span>
           <span className="analyzer__logo-badge">Job Analyzer</span>
         </div>
@@ -318,7 +318,7 @@ export default function AnalyzerPage() {
               </>
             ) : (
               <>
-                <span>🔍</span>
+                <span></span>
                 <span>Analyze Job Listing</span>
               </>
             )}
@@ -334,17 +334,6 @@ export default function AnalyzerPage() {
             </div>
           )}
 
-          {/* Info footer */}
-          {!loading && !result && (
-            <div className="input-footer">
-              <div className="info-chips">
-                <span className="info-chip"> Job Analysis Model</span>
-                <span className="info-chip"> Auto page scraper</span>
-                <span className="info-chip"> ~3 sec analysis</span>
-                <span className="info-chip"> 10+ scam patterns</span>
-              </div>
-            </div>
-          )}
         </div>
 
         {/* ══ RIGHT: Result Panel ══ */}
@@ -352,7 +341,7 @@ export default function AnalyzerPage() {
           {/* Empty state */}
           {!result && !loading && (
             <div className="result-empty fade-up d3">
-              <div className="result-empty__icon">🔍</div>
+              <div className="result-empty__icon"></div>
               <div className="result-empty__title">Ready to Scan</div>
               <div className="result-empty__sub">
                 Paste a job URL on the left and click Analyze.<br />
@@ -360,14 +349,14 @@ export default function AnalyzerPage() {
               </div>
               <div className="result-empty__checks">
                 {[
-                  ['🚩', 'Unrealistic salary claims'],
-                  ['🚩', 'Vague / missing job description'],
-                  ['🚩', 'Unverifiable company'],
-                  ['🚩', 'Upfront payment requests'],
-                  ['🚩', 'Personal info asked early'],
-                  ['✅', 'Named recruiter / hiring manager'],
-                  ['✅', 'Clear role & responsibilities'],
-                  ['✅', 'Market-rate compensation'],
+                  ['Unrealistic salary claims'],
+                  [ 'Vague / missing job description'],
+                  [ 'Unverifiable company'],
+                  [ 'Upfront payment requests'],
+                  [ 'Personal info asked early'],
+                  [ 'Named recruiter / hiring manager'],
+                  [ 'Clear role & responsibilities'],
+                  [ 'Market-rate compensation'],
                 ].map(([e, t], i) => (
                   <div key={i} className="check-item">
                     <span>{e}</span><span>{t}</span>
@@ -424,13 +413,13 @@ export default function AnalyzerPage() {
               <div className="flags-grid">
                 <div className="flags-card flags-card--red">
                   <div className="flags-card__header">
-                    <span>🚩</span> Red Flags <span className="flags-count">{result.redFlags?.length || 0}</span>
+                    <span></span> Red Flags <span className="flags-count">{result.redFlags?.length || 0}</span>
                   </div>
                   <FlagList items={result.redFlags} type="red" />
                 </div>
                 <div className="flags-card flags-card--green">
                   <div className="flags-card__header">
-                    <span>✅</span> Positive Signals <span className="flags-count">{result.positiveSignals?.length || 0}</span>
+                    <span></span> Positive Signals <span className="flags-count">{result.positiveSignals?.length || 0}</span>
                   </div>
                   <FlagList items={result.positiveSignals} type="green" />
                 </div>
@@ -438,7 +427,7 @@ export default function AnalyzerPage() {
 
               {/* ── Recommendation ── */}
               <div className="recommendation" style={{ borderColor: vc.border, background: vc.bg }}>
-                <div className="recommendation__label" style={{ color: vc.color }}>💡 Recommendation</div>
+                <div className="recommendation__label" style={{ color: vc.color }}> Recommendation</div>
                 <p className="recommendation__text">{result.recommendation}</p>
               </div>
 

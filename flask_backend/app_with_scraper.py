@@ -17,12 +17,12 @@ print("Loading model files...")
 model = joblib.load(os.path.join(MODEL_DIR, 'xgboost_model.pkl'))
 tfidf = joblib.load(os.path.join(MODEL_DIR, 'tfidf_vectorizer.pkl'))
 feature_cols = joblib.load(os.path.join(MODEL_DIR, 'feature_columns.pkl'))
-print("✅ Model loaded successfully!")
+print(" Model loaded successfully!")
 
 
 feature_cols = joblib.load(os.path.join(MODEL_DIR, 'feature_columns.pkl'))
-print("✅ Model loaded successfully!")
-print(f"\n🔍 Feature order expected by model:")
+print(" Model loaded successfully!")
+print(f"\n Feature order expected by model:")
 print(feature_cols)
 
 def extract_features_from_text(text):

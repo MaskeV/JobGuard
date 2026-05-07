@@ -394,7 +394,7 @@ async function scanEmails({ email, password, daysBack = 30, limit = 50 }) {
         const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
         const dateStr = `${months[searchDate.getMonth()]} ${String(searchDate.getDate()).padStart(2, '0')}, ${searchDate.getFullYear()}`;
 
-        console.log(`🔍 Searching emails since: ${dateStr}`);
+        console.log(` Searching emails since: ${dateStr}`);
 
         // IMAP search syntax: SINCE must be in array format [criteria, value]
         const searchCriteria = [['SINCE', dateStr]];
@@ -579,7 +579,7 @@ async function importApplicationsFromEmail(Job, { email, password, daysBack = 30
         // Optional: Analyze with AI
         if (analyzeWithAI) {
           try {
-            console.log(`🔍 Analyzing: ${jobData.title}...`);
+            console.log(` Analyzing: ${jobData.title}...`);
             const analysis = await analyzeJobListing({
               url,
               title: jobData.title,

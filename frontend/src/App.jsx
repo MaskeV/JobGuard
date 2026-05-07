@@ -82,7 +82,7 @@ export default function App() {
               onClick={() => setPage('insights')}
             >
               <span></span>
-              <span>AI Insights</span>
+              
             </button>
 
             <button 

@@ -12,19 +12,43 @@ const axios = require('axios');
 //
 // Setup: https://rapidapi.com → Sign up → Subscribe to each API → Copy your key
 
-const RAPIDAPI_KEY = "f1970f75c1mshc67d8385255fb93p10132ejsnd47fbc9cbf19"|| '';
+const RAPIDAPI_KEY = process.env.RAPIDAPI_KEY || '';
 
 // ── API 1: JSearch (Primary - Best Coverage) ─────────────────────────────────
-async function searchViaJSearch({ keywords, location, limit = 20 }) {
+async function searchViaJSearch({ keywords, location, jobType, experience, limit = 20 }) {
   try {
     console.log('  → Calling JSearch API...');
     
+    // Build query with filters
+    let query = keywords;
+    if (location) query += ` ${location}`;
+    if (jobType) query += ` ${jobType}`;
+    if (experience) query += ` ${experience}`;
+    
+    const params = {
+      query: query.trim(),
+      num_pages: '1',
+      page: '1',
+    };
+    
+    // Add employment type if specified
+    if (jobType) {
+      const typeMap = {
+        'Full-time': 'FULLTIME',
+        'Part-time': 'PARTTIME',
+        'Contract': 'CONTRACTOR',
+        'Internship': 'INTERN',
+      };
+      if (typeMap[jobType]) {
+        params.employment_types = typeMap[jobType];
+      }
+    }
+    
+    // Add date posted filter for recent jobs
+    params.date_posted = 'month'; // Jobs from last month
+    
     const { data } = await axios.get('https://jsearch.p.rapidapi.com/search', {
-      params: {
-        query: `${keywords} ${location || ''}`.trim(),
-        num_pages: '1',
-        page: '1',
-      },
+      params,
       headers: {
         'X-RapidAPI-Key': RAPIDAPI_KEY,
         'X-RapidAPI-Host': 'jsearch.p.rapidapi.com'
@@ -37,7 +61,7 @@ async function searchViaJSearch({ keywords, location, limit = 20 }) {
       return [];
     }
 
-    const jobs = data.data.slice(0, limit).map(job => ({
+    let jobs = data.data.slice(0, limit).map(job => ({
       title: job.job_title || 'Untitled',
       company: job.employer_name || 'Unknown Company',
       location: [job.job_city, job.job_state, job.job_country]
@@ -48,8 +72,15 @@ async function searchViaJSearch({ keywords, location, limit = 20 }) {
         ? `$${job.job_min_salary.toLocaleString()}-$${job.job_max_salary.toLocaleString()}`
         : job.job_salary || '',
       description: (job.job_description || '').substring(0, 500),
+      jobType: job.job_employment_type || '',
+      experienceLevel: job.job_required_experience?.required_experience_in_months 
+        ? `${Math.floor(job.job_required_experience.required_experience_in_months / 12)} years`
+        : '',
       apiSource: 'JSearch',
     }));
+
+    // Client-side filtering as fallback
+    jobs = filterByJobTypeAndExperience(jobs, jobType, experience);
 
     console.log(`  ✅ JSearch: Found ${jobs.length} jobs`);
     return jobs;
@@ -67,16 +98,23 @@ async function searchViaJSearch({ keywords, location, limit = 20 }) {
 }
 
 // ── API 2: LinkedIn Job Search (Backup) ───────────────────────────────────────
-async function searchViaLinkedIn({ keywords, location, limit = 20 }) {
+async function searchViaLinkedIn({ keywords, location, jobType, experience, limit = 20 }) {
   try {
     console.log('  → Calling LinkedIn API...');
     
+    const params = {
+      title: keywords,
+      location: location || '',
+      results: limit.toString(),
+    };
+    
+    // Add job type filter if API supports it
+    if (jobType) {
+      params.jobType = jobType;
+    }
+    
     const { data } = await axios.get('https://linkedin-job-search-api.p.rapidapi.com/search', {
-      params: {
-        title: keywords,
-        location: location || '',
-        results: limit.toString(),
-      },
+      params,
       headers: {
         'X-RapidAPI-Key': RAPIDAPI_KEY,
         'X-RapidAPI-Host': 'linkedin-job-search-api.p.rapidapi.com'
@@ -89,7 +127,7 @@ async function searchViaLinkedIn({ keywords, location, limit = 20 }) {
       return [];
     }
 
-    const jobs = data.data.map(job => ({
+    let jobs = data.data.map(job => ({
       title: job.title || 'Untitled',
       company: job.company || 'Unknown Company',
       location: job.location || 'Remote',
@@ -97,8 +135,13 @@ async function searchViaLinkedIn({ keywords, location, limit = 20 }) {
       platform: 'LinkedIn',
       salary: job.salary || '',
       description: (job.description || '').substring(0, 500),
+      jobType: job.jobType || '',
+      experienceLevel: job.experienceLevel || '',
       apiSource: 'LinkedIn API',
     }));
+
+    // Client-side filtering
+    jobs = filterByJobTypeAndExperience(jobs, jobType, experience);
 
     console.log(`  ✅ LinkedIn: Found ${jobs.length} jobs`);
     return jobs;
@@ -116,7 +159,7 @@ async function searchViaLinkedIn({ keywords, location, limit = 20 }) {
 }
 
 // ── API 3: Indeed12 (Emergency Backup) ────────────────────────────────────────
-async function searchViaIndeed({ keywords, location, limit = 15 }) {
+async function searchViaIndeed({ keywords, location, jobType, experience, limit = 15 }) {
   try {
     console.log('  → Calling Indeed12 API...');
     
@@ -126,16 +169,31 @@ async function searchViaIndeed({ keywords, location, limit = 15 }) {
     else if (location?.toLowerCase().includes('uk')) locality = 'uk';
     else if (location?.toLowerCase().includes('canada')) locality = 'ca';
     
+    const params = {
+      query: keywords,
+      location: location || 'United States',
+      page_id: '1',
+      locality: locality,
+      fromage: '7', // Last 7 days
+      radius: '50', // 50 miles
+      sort: 'date',
+    };
+    
+    // Add job type filter
+    if (jobType) {
+      const typeMap = {
+        'Full-time': 'fulltime',
+        'Part-time': 'parttime',
+        'Contract': 'contract',
+        'Internship': 'internship',
+      };
+      if (typeMap[jobType]) {
+        params.job_type = typeMap[jobType];
+      }
+    }
+    
     const { data } = await axios.get('https://indeed12.p.rapidapi.com/jobs/search', {
-      params: {
-        query: keywords,
-        location: location || 'United States',
-        page_id: '1',
-        locality: locality,
-        fromage: '7', // Last 7 days
-        radius: '50', // 50 miles
-        sort: 'date',
-      },
+      params,
       headers: {
         'X-RapidAPI-Key': RAPIDAPI_KEY,
         'X-RapidAPI-Host': 'indeed12.p.rapidapi.com'
@@ -148,7 +206,7 @@ async function searchViaIndeed({ keywords, location, limit = 15 }) {
       return [];
     }
 
-    const jobs = data.hits.slice(0, limit).map(job => ({
+    let jobs = data.hits.slice(0, limit).map(job => ({
       title: job.title || 'Untitled',
       company: job.company_name || 'Unknown Company',
       location: job.location?.city || job.location?.state || 'Remote',
@@ -156,8 +214,13 @@ async function searchViaIndeed({ keywords, location, limit = 15 }) {
       platform: 'Indeed',
       salary: job.salary_text || '',
       description: (job.description || job.snippet || '').substring(0, 500),
+      jobType: job.job_type || '',
+      experienceLevel: job.experience_level || '',
       apiSource: 'Indeed12',
     }));
+
+    // Client-side filtering
+    jobs = filterByJobTypeAndExperience(jobs, jobType, experience);
 
     console.log(`  ✅ Indeed12: Found ${jobs.length} jobs`);
     return jobs;
@@ -174,10 +237,97 @@ async function searchViaIndeed({ keywords, location, limit = 15 }) {
   }
 }
 
+// ── Helper: Filter jobs by type and experience ────────────────────────────────
+function filterByJobTypeAndExperience(jobs, jobType, experience) {
+  let filtered = jobs;
+
+  // Filter by job type
+  if (jobType) {
+    filtered = filtered.filter(job => {
+      const title = (job.title || '').toLowerCase();
+      const desc = (job.description || '').toLowerCase();
+      const jobTypeField = (job.jobType || '').toLowerCase();
+      const searchType = jobType.toLowerCase();
+
+      // Check if job type matches in title, description, or jobType field
+      return (
+        jobTypeField.includes(searchType) ||
+        title.includes(searchType) ||
+        desc.includes(searchType)
+      );
+    });
+  }
+
+  // Filter by experience level
+  if (experience) {
+    filtered = filtered.filter(job => {
+      const title = (job.title || '').toLowerCase();
+      const desc = (job.description || '').toLowerCase();
+      const expLevel = (job.experienceLevel || '').toLowerCase();
+
+      // Extract years from experience filter
+      let yearsRequired = null;
+      if (experience.includes('Entry Level')) {
+        yearsRequired = 0;
+      } else {
+        const match = experience.match(/(\d+)/);
+        if (match) {
+          yearsRequired = parseInt(match[1]);
+        }
+      }
+
+      if (yearsRequired === null) return true; // No filter
+
+      // Check for experience mentions in job posting
+      if (yearsRequired === 0) {
+        // Entry level
+        return (
+          title.includes('entry') ||
+          title.includes('junior') ||
+          title.includes('graduate') ||
+          title.includes('fresher') ||
+          desc.includes('entry level') ||
+          desc.includes('no experience') ||
+          expLevel.includes('entry')
+        );
+      } else {
+        // Check for year ranges in description
+        const yearPatterns = [
+          new RegExp(`${yearsRequired}[+-]?\\s*years?`, 'i'),
+          new RegExp(`${yearsRequired}-\\d+\\s*years?`, 'i'),
+          new RegExp(`\\d+-${yearsRequired}\\s*years?`, 'i'),
+        ];
+
+        const hasMatchingExperience = yearPatterns.some(pattern => 
+          pattern.test(title) || pattern.test(desc) || pattern.test(expLevel)
+        );
+
+        // Also check for senior/mid-level keywords
+        if (yearsRequired >= 5) {
+          return hasMatchingExperience || 
+                 title.includes('senior') || 
+                 title.includes('lead') ||
+                 desc.includes('senior') ||
+                 expLevel.includes('senior');
+        } else if (yearsRequired >= 3) {
+          return hasMatchingExperience || 
+                 title.includes('mid') || 
+                 desc.includes('mid-level') ||
+                 expLevel.includes('mid');
+        }
+
+        return hasMatchingExperience || !expLevel; // If no exp level data, include it
+      }
+    });
+  }
+
+  return filtered;
+}
+
 // ── Main Aggregator Function (Multi-API with Fallback) ───────────────────────
 async function aggregateJobs({ keywords, location, jobType, experience, platforms = [] }) {
   console.log('\n🚀 Starting multi-API job aggregation...');
-  console.log('📝 Search params:', { keywords, location });
+  console.log('📝 Search params:', { keywords, location, jobType, experience });
 
   // Validate API key
   if (!RAPIDAPI_KEY) {
@@ -201,7 +351,7 @@ async function aggregateJobs({ keywords, location, jobType, experience, platform
 
   // Try JSearch first (best coverage, 150 free/month)
   console.log('\n1️⃣ Trying JSearch API (Primary)...');
-  const jSearchJobs = await searchViaJSearch({ keywords, location, limit: 20 });
+  const jSearchJobs = await searchViaJSearch({ keywords, location, jobType, experience, limit: 20 });
   allJobs = allJobs.concat(jSearchJobs);
 
   // If we got good results from JSearch, we're done
@@ -210,14 +360,14 @@ async function aggregateJobs({ keywords, location, jobType, experience, platform
   } else {
     // Try LinkedIn next (100 free/month)
     console.log(`\n2️⃣ Need more results (have ${allJobs.length}), trying LinkedIn API...`);
-    const linkedInJobs = await searchViaLinkedIn({ keywords, location, limit: 20 });
+    const linkedInJobs = await searchViaLinkedIn({ keywords, location, jobType, experience, limit: 20 });
     allJobs = allJobs.concat(linkedInJobs);
   }
 
   // If still not enough, try Indeed (25 free/month - save for emergencies)
   if (allJobs.length < 10) {
     console.log(`\n3️⃣ Still need more (have ${allJobs.length}), trying Indeed12 API...`);
-    const indeedJobs = await searchViaIndeed({ keywords, location, limit: 15 });
+    const indeedJobs = await searchViaIndeed({ keywords, location, jobType, experience, limit: 15 });
     allJobs = allJobs.concat(indeedJobs);
   }
 
@@ -248,11 +398,17 @@ async function aggregateJobs({ keywords, location, jobType, experience, platform
   });
   console.log('📊 Breakdown by platform:', platformBreakdown);
 
+  // Show filter results
+  if (jobType || experience) {
+    console.log('🔍 Applied filters:', { jobType: jobType || 'None', experience: experience || 'None' });
+  }
+
   if (uniqueJobs.length === 0) {
     console.error('\n❌ No jobs found!');
     console.log('\n💡 Troubleshooting tips:');
     console.log('   • Try simpler keywords (e.g., "developer" instead of "senior full-stack developer")');
     console.log('   • Try broader locations (e.g., "United States" instead of "Small Town, TX")');
+    console.log('   • Remove or broaden job type and experience filters');
     console.log('   • Check if you\'ve exceeded API rate limits (check RapidAPI dashboard)');
     console.log('   • Verify APIs are subscribed on RapidAPI');
     throw new Error('No jobs found. Try different search terms or check API subscriptions.');

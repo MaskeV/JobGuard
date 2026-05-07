@@ -4,6 +4,8 @@ const Job    = require('../models/job');
 // GET /api/analytics
 router.get('/', async (req, res, next) => {
   try {
+    const userFilter = { userId: req.userId }; // Filter by authenticated user
+    
     const [
       total,
       byStatus,
@@ -14,15 +16,26 @@ router.get('/', async (req, res, next) => {
       recentActivity,
     ] = await Promise.all([
 
-      Job.countDocuments(),
-
-      Job.aggregate([{ $group: { _id: '$status', count: { $sum: 1 } } }]),
-
-      Job.aggregate([{ $group: { _id: '$platform', count: { $sum: 1 } } }, { $sort: { count: -1 } }]),
-
-      Job.aggregate([{ $group: { _id: '$analysis.verdict', count: { $sum: 1 } } }]),
+      Job.countDocuments(userFilter),
 
       Job.aggregate([
+        { $match: userFilter },
+        { $group: { _id: '$status', count: { $sum: 1 } } }
+      ]),
+
+      Job.aggregate([
+        { $match: userFilter },
+        { $group: { _id: '$platform', count: { $sum: 1 } } }, 
+        { $sort: { count: -1 } }
+      ]),
+
+      Job.aggregate([
+        { $match: userFilter },
+        { $group: { _id: '$analysis.verdict', count: { $sum: 1 } } }
+      ]),
+
+      Job.aggregate([
+        { $match: userFilter },
         {
           $group: {
             _id: { $dateToString: { format: '%Y-%m', date: '$createdAt' } },
@@ -34,11 +47,11 @@ router.get('/', async (req, res, next) => {
       ]),
 
       Job.aggregate([
-        { $match: { 'analysis.riskScore': { $gt: 0 } } },
+        { $match: { ...userFilter, 'analysis.riskScore': { $gt: 0 } } },
         { $group: { _id: null, avg: { $avg: '$analysis.riskScore' } } },
       ]),
 
-      Job.find().sort('-updatedAt').limit(5).lean(),
+      Job.find(userFilter).sort('-updatedAt').limit(5).lean(),
     ]);
 
     const statusMap   = Object.fromEntries(byStatus.map(d => [d._id,   d.count]));

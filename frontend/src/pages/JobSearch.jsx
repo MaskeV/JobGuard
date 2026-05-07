@@ -3,13 +3,13 @@ import { searchJobs, parseResume } from '../services/api';
 import '../styles/JobSearch.css';
 
 const PLATFORMS = [
-  { id: 'linkedin', name: 'LinkedIn', icon: '💼' },
+  { id: 'linkedin', name: 'LinkedIn' },
   { id: 'naukri', name: 'Naukri', icon: '🇮🇳' },
-  { id: 'indeed', name: 'Indeed', icon: '🔍' },
-  { id: 'internshala', name: 'Internshala', icon: '🎓' },
-  { id: 'foundit', name: 'Foundit', icon: '🔎' },
+  { id: 'indeed', name: 'Indeed' },
+  { id: 'internshala', name: 'Internshala'},
+  { id: 'foundit', name: 'Foundit'},
 ];
-t
+
 const JOB_TYPES = ['Full-time', 'Part-time', 'Contract', 'Internship', 'Freelance'];
 const EXPERIENCE_LEVELS = ['Entry Level', '1-3 years', '3-5 years', '5-10 years', '10+ years'];
 
@@ -173,7 +173,7 @@ export default function JobSearch() {
     <div className="job-search">
       <header className="job-search__header fade-up">
         <h1 className="job-search__title">
-          <span>🔍</span> Job Search
+          <span></span> Job Search
         </h1>
         <p className="job-search__subtitle">
           Search across LinkedIn, Naukri, Indeed, Internshala & more
@@ -256,23 +256,7 @@ export default function JobSearch() {
           </div>
         </div>
 
-        {/* Platform Selection */}
-        <div className="form-group">
-          <label>Search Platforms</label>
-          <div className="platform-select">
-            {PLATFORMS.map(platform => (
-              <button
-                key={platform.id}
-                type="button"
-                className={`platform-btn ${selectedPlatforms.includes(platform.id) ? 'platform-btn--active' : ''}`}
-                onClick={() => togglePlatform(platform.id)}
-              >
-                <span>{platform.icon}</span>
-                <span>{platform.name}</span>
-              </button>
-            ))}
-          </div>
-        </div>
+       
 
         {error && (
           <div className="search-error">
@@ -292,7 +276,7 @@ export default function JobSearch() {
             </>
           ) : (
             <>
-              <span>🔍</span>
+              <span></span>
               Search Jobs
             </>
           )}
@@ -336,11 +320,11 @@ export default function JobSearch() {
 
       {!loading && results.length === 0 && !error && (
         <div className="search-empty fade-up d3">
-          <div className="search-empty__icon">🔍</div>
+          <div className="search-empty__icon"></div>
           <h3>Ready to Search</h3>
           <p>Enter job keywords and select platforms to start searching</p>
           <div className="search-tips">
-            <h4>💡 Pro Tips:</h4>
+            <h4> Pro Tips:</h4>
             <ul>
               <li>Use specific job titles (e.g., "React Developer" vs just "Developer")</li>
               <li>Include location for better results</li>

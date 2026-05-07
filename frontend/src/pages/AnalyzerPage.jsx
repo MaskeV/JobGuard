@@ -306,7 +306,7 @@ export default function AnalyzerPage() {
             {loading ? (
               <><span className="btn-spinner" /><span>Analyzing with Gemini Flash...</span></>
             ) : (
-              <><span>🔍</span><span>Analyze Job Listing</span></>
+              <><span></span><span>Analyze Job Listing</span></>
             )}
           </button>
 
@@ -339,7 +339,7 @@ export default function AnalyzerPage() {
           {/* Empty state */}
           {!result && !loading && (
             <div className="result-empty fade-up d3">
-              <div className="result-empty__icon">🔍</div>
+              <div className="result-empty__icon"></div>
               <div className="result-empty__title">Ready to Scan</div>
               <div className="result-empty__sub">
                 Paste a job URL on the left and click Analyze.<br />

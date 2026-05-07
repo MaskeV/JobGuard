@@ -65,32 +65,51 @@ router.post('/', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// PATCH /api/jobs/:id  — update job (partial update)
 router.patch('/:id', async (req, res, next) => {
   try {
+    console.log('PATCH request for job:', req.params.id);
+    console.log('Update data:', req.body);
+    
     const job = await Job.findById(req.params.id);
-    if (!job) return res.status(404).json({ error: 'Job not found' });
+    if (!job) {
+      return res.status(404).json({ error: 'Job not found' });
+    }
 
     const prevStatus = job.status;
-    const newStatus  = req.body.status;
+    const newStatus = req.body.status;
 
-    // Apply updates
-    Object.assign(job, req.body);
+    // Apply updates - but don't allow _id to be updated
+    const allowedUpdates = ['status', 'notes', 'followUpDate', 'salary', 'location', 'recruiterName', 'recruiterEmail'];
+    allowedUpdates.forEach(field => {
+      if (req.body[field] !== undefined) {
+        job[field] = req.body[field];
+      }
+    });
 
     // Track status history
     if (newStatus && newStatus !== prevStatus) {
       job.statusHistory.push({
-        status:    newStatus,
-        note:      req.body.statusNote || '',
+        status: newStatus,
+        note: req.body.statusNote || '',
         changedAt: new Date(),
       });
-      // Send email notification
-      await sendStatusEmail(job, newStatus, req.body.statusNote || '');
+      
+      // Send email notification (make sure this doesn't break if email service fails)
+      try {
+        await sendStatusEmail(job, newStatus, req.body.statusNote || '');
+      } catch (emailErr) {
+        console.error('Failed to send status email:', emailErr);
+        // Don't fail the whole update if email fails
+      }
     }
 
     await job.save();
+    console.log('Job updated successfully:', job._id);
     res.json(job);
-  } catch (err) { next(err); }
+  } catch (err) { 
+    console.error('Error in PATCH /api/jobs/:id:', err);
+    next(err); 
+  }
 });
 
 // DELETE /api/jobs/:id

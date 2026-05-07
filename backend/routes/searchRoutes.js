@@ -21,7 +21,7 @@ router.post('/jobs', async (req, res, next) => {
       return res.status(400).json({ error: 'Keywords are required' });
     }
 
-    console.log('🔍 Job search request:', { keywords, location, jobType, experience, platforms });
+    console.log(' Job search request:', { keywords, location, jobType, experience, platforms });
 
     // Aggregate jobs from multiple platforms
     const jobs = await aggregateJobs({

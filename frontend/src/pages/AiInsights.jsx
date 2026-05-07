@@ -1,8 +1,7 @@
 import { generateAIInsights } from '../services/api';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { getJobs, getAnalytics } from '../services/api';
 import '../styles/AiInsights.css';
-
-// Remove the callGemini function entirely
 
 async function generatePipelineHealth(jobs, analytics) {
   return await generateAIInsights('pipeline-health', jobs, analytics);
@@ -26,7 +25,44 @@ async function generateScamInsights(jobs) {
     analyzed: analyzed.length,
   };
 }
-function LoadingCard({ title }) {
+
+function HealthGauge({ score, label }) {
+  const color = score >= 75 ? '#34d399' : score >= 50 ? '#63b3ed' : score >= 30 ? '#fbbf24' : '#f87171';
+  const r = 60;
+  const circ = Math.PI * r;
+  const offset = circ - (score / 100) * circ;
+  return (
+    <div className="health-gauge">
+      <svg width="160" height="90" viewBox="0 0 160 90">
+        <path d="M 20 80 A 60 60 0 0 1 140 80" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="12" strokeLinecap="round" />
+        <path
+          d="M 20 80 A 60 60 0 0 1 140 80"
+          fill="none" stroke={color} strokeWidth="12"
+          strokeLinecap="round"
+          strokeDasharray={`${circ}`}
+          strokeDashoffset={offset}
+          style={{ transition: 'stroke-dashoffset 1.4s cubic-bezier(0.34,1.56,0.64,1)' }}
+        />
+      </svg>
+      <div className="health-gauge__val" style={{ color }}>{score}</div>
+      <div className="health-gauge__label" style={{ color }}>{label}</div>
+    </div>
+  );
+}
+
+function InsightCard({ icon, title, children, accent }) {
+  return (
+    <div className="insight-card" style={{ borderColor: accent ? `${accent}30` : undefined, background: accent ? `${accent}06` : undefined }}>
+      <div className="insight-card__header">
+        <span className="insight-card__icon">{icon}</span>
+        <span className="insight-card__title">{title}</span>
+      </div>
+      <div className="insight-card__body">{children}</div>
+    </div>
+  );
+}
+
+function LoadingCard() {
   return (
     <div className="insight-card insight-card--loading">
       <div className="insight-card__header">
@@ -57,14 +93,11 @@ function WeeklyPlan({ plan }) {
     Monday: '#63b3ed', Tuesday: '#a78bfa', Wednesday: '#34d399',
     Thursday: '#fbbf24', Friday: '#f97316',
   };
-
   return (
     <div className="weekly-plan">
       {plan.actions?.map((a, i) => (
         <div key={i} className="plan-item">
-          <div className="plan-item__day" style={{ color: dayColors[a.day] || 'var(--accent)' }}>
-            {a.day}
-          </div>
+          <div className="plan-item__day" style={{ color: dayColors[a.day] || 'var(--accent)' }}>{a.day}</div>
           <div className="plan-item__content">
             <div className="plan-item__action">{a.action}</div>
             <div className="plan-item__why">{a.why}</div>
@@ -76,17 +109,14 @@ function WeeklyPlan({ plan }) {
   );
 }
 
-// ── Main Component ────────────────────────────────────────────────────────────
 export default function AIInsights() {
   const [jobs, setJobs] = useState([]);
   const [analytics, setAnalytics] = useState(null);
   const [loadingData, setLoadingData] = useState(true);
-
   const [health, setHealth] = useState(null);
   const [patterns, setPatterns] = useState(null);
   const [scam, setScam] = useState(null);
   const [weekPlan, setWeekPlan] = useState(null);
-
   const [healthLoading, setHealthLoading] = useState(false);
   const [patternsLoading, setPatternsLoading] = useState(false);
   const [planLoading, setPlanLoading] = useState(false);
@@ -96,10 +126,15 @@ export default function AIInsights() {
 
   useEffect(() => {
     async function load() {
-      const [jobsData, analyticsData] = await Promise.all([getJobs({}), getAnalytics()]);
-      setJobs(jobsData);
-      setAnalytics(analyticsData);
-      setLoadingData(false);
+      try {
+        const [jobsData, analyticsData] = await Promise.all([getJobs({}), getAnalytics()]);
+        setJobs(jobsData);
+        setAnalytics(analyticsData);
+      } catch (err) {
+        console.error('Failed to load data:', err);
+      } finally {
+        setLoadingData(false);
+      }
     }
     load();
   }, []);
@@ -112,24 +147,16 @@ export default function AIInsights() {
     setGenerating(true);
     setError('');
     setHealth(null); setPatterns(null); setScam(null); setWeekPlan(null);
+    setHealthLoading(true); setPatternsLoading(true); setPlanLoading(true);
 
     try {
-      // Run in parallel for speed
-      setHealthLoading(true);
-      setPatternsLoading(true);
-      setPlanLoading(true);
-
       const [h, p, s, w] = await Promise.all([
         generatePipelineHealth(jobs, analytics).finally(() => setHealthLoading(false)),
         generateRolePatterns(jobs).finally(() => setPatternsLoading(false)),
         generateScamInsights(jobs),
         generateWeeklyPlan(jobs, analytics).finally(() => setPlanLoading(false)),
       ]);
-
-      setHealth(h);
-      setPatterns(p);
-      setScam(s);
-      setWeekPlan(w);
+      setHealth(h); setPatterns(p); setScam(s); setWeekPlan(w);
       setGenerated(true);
     } catch (err) {
       setError(`Failed to generate insights: ${err.message}`);
@@ -144,51 +171,34 @@ export default function AIInsights() {
 
   return (
     <div className="ai-insights">
-
-      {/* Header */}
       <header className="ai-insights__header fade-up">
         <div className="ai-insights__logo">
           <div className="ai-insights__logo-icon">✦</div>
           <div>
             <h1 className="ai-insights__title">AI Insights</h1>
-            <p className="ai-insights__sub">
-              Personalised coaching based on your {analytics?.total || 0} tracked applications
-            </p>
+            <p className="ai-insights__sub">Personalised coaching based on your {analytics?.total || 0} tracked applications</p>
           </div>
         </div>
-
-        <button
-          className={`generate-btn ${generating ? 'generate-btn--loading' : ''}`}
-          onClick={generateAllInsights}
-          disabled={generating || loadingData}
-        >
-          {generating ? (
-            <><span className="gen-spinner" />Analysing your pipeline…</>
-          ) : generated ? (
-            <>↺ Regenerate insights</>
-          ) : (
-            <>✦ Generate AI insights</>
-          )}
+        <button className={`generate-btn ${generating ? 'generate-btn--loading' : ''}`} onClick={generateAllInsights} disabled={generating || loadingData}>
+          {generating ? <><span className="gen-spinner" />Analysing…</> : generated ? <>↺ Regenerate insights</> : <>✦ Generate AI insights</>}
         </button>
       </header>
 
-      {/* No jobs state */}
       {jobs.length === 0 && (
         <div className="ai-insights__empty fade-up">
           <div className="ai-insights__empty-icon">📭</div>
           <h3>No jobs tracked yet</h3>
-          <p>Add jobs via the Analyzer or Job Search tab first. Once you have a few tracked, AI Insights will analyse your pipeline and give you personalised coaching.</p>
+          <p>Add jobs via the Analyzer or Job Search tab first.</p>
         </div>
       )}
 
-      {/* Prompt to generate */}
       {jobs.length > 0 && !generated && !generating && !error && (
         <div className="ai-insights__prompt fade-up d1">
           <div className="prompt-card">
             <div className="prompt-card__icon">✦</div>
             <div className="prompt-card__text">
               <strong>Ready to analyse {jobs.length} applications</strong>
-              <p>Click "Generate AI insights" to get your pipeline health score, role patterns, scam exposure, and a personalised action plan for this week.</p>
+              <p>Click "Generate AI insights" to get your pipeline health score, role patterns, scam exposure, and a personalised weekly action plan.</p>
             </div>
           </div>
           <div className="preview-stats">
@@ -207,20 +217,12 @@ export default function AIInsights() {
         </div>
       )}
 
-      {/* Error */}
-      {error && (
-        <div className="insights-error fade-up">⚠ {error}</div>
-      )}
+      {error && <div className="insights-error fade-up">⚠ {error}</div>}
 
-      {/* ── Insights grid ── */}
       {(generating || generated) && (
         <div className="insights-grid">
-
-          {/* Pipeline health */}
-          {healthLoading ? (
-            <LoadingCard title="Pipeline health" />
-          ) : health ? (
-            <InsightCard  title="Pipeline health" accent={health.healthScore >= 60 ? '#34d399' : '#f87171'}>
+          {healthLoading ? <LoadingCard /> : health ? (
+            <InsightCard icon="📊" title="Pipeline health" accent={health.healthScore >= 60 ? '#34d399' : '#f87171'}>
               <div className="health-row">
                 <HealthGauge score={health.healthScore} label={health.healthLabel} />
                 <div className="health-details">
@@ -244,10 +246,7 @@ export default function AIInsights() {
             </InsightCard>
           ) : null}
 
-          {/* Role patterns */}
-          {patternsLoading ? (
-            <LoadingCard title="Role patterns" />
-          ) : patterns ? (
+          {patternsLoading ? <LoadingCard /> : patterns ? (
             <InsightCard icon="🎯" title="Role patterns & strategy">
               <p className="pattern-insight">{patterns.patternInsight}</p>
               <p className="pattern-insight" style={{ marginTop: 6 }}>{patterns.companyTypeInsight}</p>
@@ -256,29 +255,22 @@ export default function AIInsights() {
                 <div className="role-recs">
                   <div className="role-recs__label">Roles worth exploring</div>
                   <div className="role-recs__chips">
-                    {patterns.roleRecommendations.map((r, i) => (
-                      <span key={i} className="role-chip">{r}</span>
-                    ))}
+                    {patterns.roleRecommendations.map((r, i) => <span key={i} className="role-chip">{r}</span>)}
                   </div>
                 </div>
               )}
             </InsightCard>
           ) : null}
 
-          {/* Scam exposure */}
           {scam && (
             <InsightCard icon="🛡️" title="Scam exposure" accent={scam.fakeCount > 0 ? '#f87171' : '#34d399'}>
               <div className="scam-stats">
                 <div className="scam-stat">
-                  <div className="scam-stat__val" style={{ color: scam.fakeCount > 0 ? '#f87171' : '#34d399' }}>
-                    {scam.fakeCount}
-                  </div>
+                  <div className="scam-stat__val" style={{ color: scam.fakeCount > 0 ? '#f87171' : '#34d399' }}>{scam.fakeCount}</div>
                   <div className="scam-stat__label">Fake jobs detected</div>
                 </div>
                 <div className="scam-stat">
-                  <div className="scam-stat__val" style={{ color: scam.suspiciousCount > 0 ? '#fbbf24' : '#34d399' }}>
-                    {scam.suspiciousCount}
-                  </div>
+                  <div className="scam-stat__val" style={{ color: scam.suspiciousCount > 0 ? '#fbbf24' : '#34d399' }}>{scam.suspiciousCount}</div>
                   <div className="scam-stat__label">Suspicious jobs</div>
                 </div>
                 <div className="scam-stat">
@@ -288,23 +280,19 @@ export default function AIInsights() {
               </div>
               <p className="scam-msg">
                 {scam.fakeCount > 0
-                  ? `⚠ ${scam.fakeCount} of your applications may be scams. Review and remove them to keep your tracker clean.`
+                  ? `⚠ ${scam.fakeCount} of your applications may be scams.`
                   : scam.suspiciousCount > 0
-                  ? `${scam.suspiciousCount} jobs flagged as suspicious. Research those companies before investing more time.`
-                  : `Your tracked jobs look clean — no obvious scams detected across ${scam.analyzed} analysed listings.`}
+                  ? `${scam.suspiciousCount} jobs flagged as suspicious.`
+                  : `Your tracked jobs look clean across ${scam.analyzed} analysed listings.`}
               </p>
             </InsightCard>
           )}
 
-          {/* Weekly plan */}
-          {planLoading ? (
-            <LoadingCard title="Weekly action plan" />
-          ) : weekPlan ? (
+          {planLoading ? <LoadingCard /> : weekPlan ? (
             <InsightCard icon="📅" title="Your personalised weekly plan" accent="#a78bfa">
               <WeeklyPlan plan={weekPlan} />
             </InsightCard>
           ) : null}
-
         </div>
       )}
     </div>

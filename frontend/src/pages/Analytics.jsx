@@ -376,12 +376,12 @@ export default function Analytics() {
       {/* ── Stat cards (always visible) ── */}
       <div className="stat-row fade-up d1">
         {[
-          { label: 'Total tracked', value: analytics?.total || 0, color: '#63b3ed', icon: '📊' },
-          { label: 'Applied', value: analytics?.applied || 0, color: '#3b82f6', icon: '📨' },
-          { label: 'Interviews', value: analytics?.interviews || 0, color: '#f59e0b', icon: '🎯' },
-          { label: 'Offers', value: analytics?.offers || 0, color: '#10b981', icon: '🏆' },
-          { label: 'Response rate', value: `${analytics?.responseRate || 0}%`, color: '#a78bfa', icon: '📈' },
-          { label: 'Avg risk score', value: analytics?.avgRiskScore || 0, color: (analytics?.avgRiskScore || 0) > 50 ? '#f87171' : '#34d399', icon: '🚨' },
+          { label: 'Total tracked', value: analytics?.total || 0, color: '#63b3ed' },
+          { label: 'Applied', value: analytics?.applied || 0, color: '#3b82f6' },
+          { label: 'Interviews', value: analytics?.interviews || 0, color: '#f59e0b'},
+          { label: 'Offers', value: analytics?.offers || 0, color: '#10b981' },
+          { label: 'Response rate', value: `${analytics?.responseRate || 0}%`, color: '#a78bfa' },
+          { label: 'Avg risk score', value: analytics?.avgRiskScore || 0, color: (analytics?.avgRiskScore || 0) > 50 ? '#f87171' : '#34d399', },
         ].map((s, i) => (
           <div key={i} className="stat-card fade-up" style={{ animationDelay: `${i * 0.04}s` }}>
             <div className="stat-card__icon" style={{ background: `${s.color}15` }}>{s.icon}</div>
